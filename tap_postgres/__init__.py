@@ -117,6 +117,7 @@ def schema_for_column_datatype(c):
     if data_type in {'time without time zone', 'time with time zone'}:
         #times are treated as ordinary strings as they can not possible match RFC3339
         schema['type'] = nullable_column('string', c.is_primary_key)
+        schema['format'] = 'time'
         return schema
 
     if data_type in ('date', 'timestamp without time zone', 'timestamp with time zone'):
