@@ -227,12 +227,12 @@ def schema_for_column(c):
 
 #this seems to identify all arrays:
 #select typname from pg_attribute  as pga join pg_type as pgt on pgt.oid = pga.atttypid  where typlen = -1 and typelem != 0 and pga.attndims > 0;
-def produce_table_info(conn):
+def produce_table_info(conn, filter_schemas=None):
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
         cur.itersize = post_db.cursor_iter_size
         table_info = {}
           # SELECT CASE WHEN $2.typtype = 'd' THEN $2.typbasetype ELSE $1.atttypid END
-        cur.execute("""
+        sql = """
 SELECT
   pg_class.reltuples::BIGINT                            AS approximate_row_count,
   (pg_class.relkind = 'v' or pg_class.relkind = 'm')    AS is_view,
@@ -272,7 +272,13 @@ WHERE attnum > 0
 AND NOT a.attisdropped
 AND pg_class.relkind IN ('r', 'v', 'm')
 AND n.nspname NOT in ('pg_toast', 'pg_catalog', 'information_schema')
-AND has_table_privilege(pg_class.oid, 'SELECT') = true """)
+AND has_table_privilege(pg_class.oid, 'SELECT') = true """
+
+        if filter_schemas:
+            sql = post_db.filter_schemas_sql_clause(sql, filter_schemas)
+
+        cur.execute(sql)
+
         for row in cur.fetchall():
             row_count, is_view, schema_name, table_name, *col_info = row
 
@@ -378,8 +384,8 @@ def discover_columns(connection, table_info):
 
     return entries
 
-def discover_db(connection):
-    table_info = produce_table_info(connection)
+def discover_db(connection, filter_schemas=None):
+    table_info = produce_table_info(connection, filter_schemas)
     db_streams = discover_columns(connection, table_info)
     return db_streams
 
@@ -424,7 +430,7 @@ def do_discovery(conn_config):
         LOGGER.info("Discovering db %s", dbname)
         conn_config['dbname'] = dbname
         with post_db.open_connection(conn_config) as conn:
-            db_streams = discover_db(conn)
+            db_streams = discover_db(conn, conn_config.get('filter_schemas'))
             all_streams = all_streams + db_streams
 
 
@@ -687,12 +693,13 @@ def do_sync(conn_config, catalog, default_replication_method, state):
 
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    conn_config = {'host'     : args.config['host'],
-                   'user'     : args.config['user'],
-                   'password' : args.config['password'],
-                   'port'     : args.config['port'],
-                   'dbname'   : args.config['dbname'],
-                   'filter_dbs' : args.config.get('filter_dbs')}
+    conn_config = {'host'           : args.config['host'],
+                   'user'           : args.config['user'],
+                   'password'       : args.config['password'],
+                   'port'           : args.config['port'],
+                   'dbname'         : args.config['dbname'],
+                   'filter_dbs'     : args.config.get('filter_dbs'),
+                   'filter_schemas' : args.config.get('filter_schemas')}
 
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
