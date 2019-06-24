@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,invalid-name,too-many-return-statements,too-many-branches,len-as-condition,too-many-statements,broad-except
+# pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,invalid-name,too-many-return-statements,too-many-branches,len-as-condition,too-many-statements,broad-except,unnecessary-lambda
 
 import datetime
 import pdb
@@ -70,6 +70,7 @@ def schema_for_column_datatype(c):
         schema['minimum'] = -1 * (2**(c.numeric_precision - 1))
         schema['maximum'] = 2**(c.numeric_precision - 1) - 1
         return schema
+
     if data_type == 'money':
         schema['type'] = nullable_column('string', c.is_primary_key)
         return schema
@@ -168,6 +169,8 @@ def schema_for_column(c):
 
     if c.sql_data_type == 'integer[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_integer_array'}
+    elif c.sql_data_type == 'bigint[]':
+        column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_integer_array'}
     elif c.sql_data_type == 'bit[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_boolean_array'}
     elif c.sql_data_type == 'boolean[]':
@@ -185,7 +188,6 @@ def schema_for_column(c):
         precision = post_db.numeric_precision(c)
         schema_name = schema_name_for_numeric_array(precision, scale)
         column_schema['items'] = {'$ref': '#/definitions/{}'.format(schema_name)}
-
     elif c.sql_data_type == 'double precision[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_number_array'}
     elif c.sql_data_type == 'hstore[]':
@@ -340,6 +342,7 @@ def discover_columns(connection, table_info):
     entries = []
     for schema_name in table_info.keys():
         for table_name in table_info[schema_name].keys():
+
             mdata = {}
             columns = table_info[schema_name][table_name]['columns']
             table_pks = [col_name for col_name, col_info in columns.items() if col_info.is_primary_key]
@@ -435,35 +438,10 @@ def do_discovery(conn_config):
 
 
     if len(all_streams) == 0:
-        LOGGER.warning("0 tables were discovered across the entire cluster")
+        raise RuntimeError('0 tables were discovered across the entire cluster')
 
     dump_catalog(all_streams)
     return all_streams
-
-
-def should_sync_column(md_map, field_name):
-
-    inclusion = md_map.get(('properties', field_name), {}).get('inclusion')
-    selected = md_map.get(('properties', field_name), {}).get('selected')
-    selected_by_default = md_map.get(('properties', field_name), {}).get('selected-by-default')
-
-    #always sync replication_keys
-    if md_map.get((), {}).get('replication-key') == field_name:
-        return True
-
-    if inclusion == 'unsupported':
-        return False
-
-    if selected:
-        return True
-
-    if inclusion == 'automatic':
-        return True
-
-    if selected_by_default and (selected is not False):
-        return True
-
-    return False
 
 def is_selected_via_metadata(stream):
     table_md = metadata.to_map(stream['metadata']).get((), {})
@@ -489,12 +467,8 @@ def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
         raise Exception("invalid keys found in state: {}".format(illegal_bk_keys))
 
     state = singer.write_bookmark(state, stream['tap_stream_id'], 'replication_key', replication_key)
-    if md_map.get((), {}).get('is-view'):
-        pks = md_map.get(()).get('table-key-properties')
-    else:
-        pks = md_map.get(()).get('table-key-properties')
 
-    sync_common.send_schema_message(stream, pks)
+    sync_common.send_schema_message(stream, [replication_key])
     state = incremental.sync_table(conn_config, stream, state, desired_columns, md_map)
 
     return state
@@ -529,7 +503,7 @@ def sync_method_for_streams(streams, state, default_replication_method):
             raise Exception("Unrecognized replication_method {}".format(replication_method))
 
         md_map = metadata.to_map(stream['metadata'])
-        desired_columns = [c for c in stream['schema']['properties'].keys() if should_sync_column(md_map, c)]
+        desired_columns = [c for c in stream['schema']['properties'].keys() if sync_common.should_sync_column(md_map, c)]
         desired_columns.sort()
 
         if len(desired_columns) == 0:
@@ -567,11 +541,11 @@ def sync_method_for_streams(streams, state, default_replication_method):
 
     return lookup, traditional_steams, logical_streams
 
-def sync_traditional_stream(conn_config, stream, state, sync_method):
+def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     LOGGER.info("Beginning sync of stream(%s) with sync method(%s)", stream['tap_stream_id'], sync_method)
     md_map = metadata.to_map(stream['metadata'])
     conn_config['dbname'] = md_map.get(()).get('database-name')
-    desired_columns = [c for c in stream['schema']['properties'].keys() if should_sync_column(md_map, c)]
+    desired_columns = [c for c in stream['schema']['properties'].keys() if sync_common.should_sync_column(md_map, c)]
     desired_columns.sort()
 
     if len(desired_columns) == 0:
@@ -588,7 +562,6 @@ def sync_traditional_stream(conn_config, stream, state, sync_method):
         state = do_sync_incremental(conn_config, stream, state, desired_columns, md_map)
     elif sync_method == 'logical_initial':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
-        end_lsn = logical_replication.fetch_current_lsn(conn_config)
         LOGGER.info("Performing initial full table sync")
         state = singer.write_bookmark(state, stream['tap_stream_id'], 'lsn', end_lsn)
 
@@ -607,12 +580,12 @@ def sync_traditional_stream(conn_config, stream, state, sync_method):
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
     return state
 
-def sync_logical_streams(conn_config, logical_streams, state):
+def sync_logical_streams(conn_config, logical_streams, state, end_lsn):
     if logical_streams:
-        LOGGER.info("Pure Logical Replication upto lsn %s for (%s)", logical_replication.fetch_current_lsn(conn_config), list(map(lambda s: s['tap_stream_id'], logical_streams)))
-        logical_streams = list(map(logical_replication.add_automatic_properties, logical_streams))
+        LOGGER.info("Pure Logical Replication upto lsn %s for (%s)", end_lsn, list(map(lambda s: s['tap_stream_id'], logical_streams)))
+        logical_streams = list(map(lambda s: logical_replication.add_automatic_properties(s, conn_config), logical_streams))
 
-        state = logical_replication.sync_tables(conn_config, logical_streams, state)
+        state = logical_replication.sync_tables(conn_config, logical_streams, state, end_lsn)
 
     return state
 
@@ -650,6 +623,10 @@ def register_type_adapters(conn_config):
                 psycopg2.extensions.new_array_type(
                     (money_array_oid,), 'MONEY[]', psycopg2.STRING))
 
+            #json and jsbon
+            psycopg2.extras.register_default_json(loads=lambda x: str(x))
+            psycopg2.extras.register_default_jsonb(loads=lambda x: str(x))
+
             #enum[]'s
             cur.execute("SELECT distinct(t.typarray) FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid")
             for oid in cur.fetchall():
@@ -659,16 +636,28 @@ def register_type_adapters(conn_config):
                         (enum_oid,), 'ENUM_{}[]'.format(enum_oid), psycopg2.STRING))
 
 
+def any_logical_streams(streams, default_replication_method):
+    for stream in streams:
+        stream_metadata = metadata.to_map(stream['metadata'])
+        replication_method = stream_metadata.get((), {}).get('replication-method', default_replication_method)
+        if replication_method == 'LOG_BASED':
+            return True
+
+    return False
 
 def do_sync(conn_config, catalog, default_replication_method, state):
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
     streams.sort(key=lambda s: s['tap_stream_id'])
     LOGGER.info("Selected streams: %s ", list(map(lambda s: s['tap_stream_id'], streams)))
+    if any_logical_streams(streams, default_replication_method):
+        LOGGER.info("Use of logical replication requires fetching an lsn...")
+        end_lsn = logical_replication.fetch_current_lsn(conn_config)
+        LOGGER.info("End LSN: %s ", end_lsn)
+    else:
+        end_lsn = None
 
     sync_method_lookup, traditional_streams, logical_streams = sync_method_for_streams(streams, state, default_replication_method)
-    #{"chickens" : "full_stream", "cows" : "logical_initial_interrupted_streams", "turkeys": "logical_replication"}
-    #{"logical_streams" : ["turkeys"], "traditional_streams" : ["chickens", "cows"]}
 
     if currently_syncing:
         LOGGER.info("found currently_syncing: %s", currently_syncing)
@@ -680,26 +669,26 @@ def do_sync(conn_config, catalog, default_replication_method, state):
     else:
         LOGGER.info("No currently_syncing found")
 
-
-
     for stream in traditional_streams:
-        state = sync_traditional_stream(conn_config, stream, state, sync_method_lookup[stream['tap_stream_id']])
+        state = sync_traditional_stream(conn_config, stream, state, sync_method_lookup[stream['tap_stream_id']], end_lsn)
 
     logical_streams.sort(key=lambda s: metadata.to_map(s['metadata']).get(()).get('database-name'))
     for dbname, streams in itertools.groupby(logical_streams, lambda s: metadata.to_map(s['metadata']).get(()).get('database-name')):
         conn_config['dbname'] = dbname
-        state = sync_logical_streams(conn_config, list(streams), state)
+        state = sync_logical_streams(conn_config, list(streams), state, end_lsn)
     return state
 
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    conn_config = {'host'           : args.config['host'],
-                   'user'           : args.config['user'],
-                   'password'       : args.config['password'],
-                   'port'           : args.config['port'],
-                   'dbname'         : args.config['dbname'],
-                   'filter_dbs'     : args.config.get('filter_dbs'),
-                   'filter_schemas' : args.config.get('filter_schemas')}
+    conn_config = {'host'     : args.config['host'],
+                   'user'     : args.config['user'],
+                   'password' : args.config['password'],
+                   'port'     : args.config['port'],
+                   'dbname'   : args.config['dbname'],
+                   'filter_dbs' : args.config.get('filter_dbs'),
+                   'filter_schemas' : args.config.get('filter_schemas'),
+                   'debug_lsn' : args.config.get('debug_lsn') == 'true',
+                   'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))}
 
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
@@ -710,9 +699,9 @@ def main_impl():
 
     if args.discover:
         do_discovery(conn_config)
-    elif args.properties:
+    elif args.properties or args.catalog:
         state = args.state
-        do_sync(conn_config, args.properties, args.config.get('default_replication_method'), state)
+        do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties, args.config.get('default_replication_method'), state)
     else:
         LOGGER.info("No properties were selected")
 
