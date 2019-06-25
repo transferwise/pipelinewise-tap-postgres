@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='pipelinewise-tap-postgres',
-      version='1.0.4',
+      version='1.0.5',
       description='Singer.io tap for extracting data from PostgreSQL - PipelineWise compatible',
       author='Stitch',
       url='https://github.com/transferwise/pipelinewise-tap-postgres',
