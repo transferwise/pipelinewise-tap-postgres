@@ -295,8 +295,8 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     if msg.data_start > end_lsn:
         raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
 
-    msg.cursor.send_feedback(flush_lsn=msg.data_start)
-
+    # Flush Postgres log up to lsn received in current run
+    # msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
     return state
 
@@ -338,6 +338,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
+
+            # Flush Postgres log up to lsn saved in state file from previous run
+            cur.send_feedback(flush_lsn=start_lsn)
 
             rows_saved = 0
             while True:
