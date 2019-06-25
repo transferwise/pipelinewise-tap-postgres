@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,invalid-name,too-many-return-statements,too-many-branches,len-as-condition,too-many-nested-blocks,wrong-import-order,duplicate-code, anomalous-backslash-in-string, too-many-statements, consider-using-in, singleton-comparison
+# pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,invalid-name,too-many-return-statements,too-many-branches,len-as-condition,too-many-nested-blocks,wrong-import-order,duplicate-code, anomalous-backslash-in-string, too-many-statements, singleton-comparison, consider-using-in
 
 import singer
 import datetime
@@ -46,8 +46,14 @@ def fetch_current_lsn(conn_config):
             file, index = current_lsn.split('/')
             return (int(file, 16)  << 32) + int(index, 16)
 
-def add_automatic_properties(stream):
+def add_automatic_properties(stream, conn_config):
     stream['schema']['properties']['_sdc_deleted_at'] = {'type' : ['null', 'string'], 'format' :'date-time'}
+    if conn_config.get('debug_lsn'):
+        LOGGER.info('debug_lsn is ON')
+        stream['schema']['properties']['_sdc_lsn'] = {'type' : ['null', 'string']}
+    else:
+        LOGGER.info('debug_lsn is OFF')
+
     return stream
 
 def get_stream_version(tap_stream_id, state):
@@ -185,9 +191,15 @@ def selected_value_to_singer_value(elem, sql_datatype, conn_info):
 def row_to_singer_message(stream, row, version, columns, time_extracted, md_map, conn_info):
     row_to_persist = ()
     md_map[('properties', '_sdc_deleted_at')] = {'sql-datatype' : 'timestamp with time zone'}
+    md_map[('properties', '_sdc_lsn')] = {'sql-datatype' : "character varying"}
 
     for idx, elem in enumerate(row):
-        sql_datatype = md_map.get(('properties', columns[idx]))['sql-datatype']
+        sql_datatype = md_map.get(('properties', columns[idx])).get('sql-datatype')
+
+        if not sql_datatype:
+            LOGGER.info("No sql-datatype found for stream %s: %s", stream, columns[idx])
+            raise Exception("Unable to find sql-datatype for stream {}".format(stream))
+
         cleaned_elem = selected_value_to_singer_value(elem, sql_datatype, conn_info)
         row_to_persist += (cleaned_elem,)
 
@@ -199,7 +211,7 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         version=version,
         time_extracted=time_extracted)
 
-def consume_message(streams, state, msg, time_extracted, conn_info):
+def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     payload = json.loads(msg.payload)
     lsn = msg.data_start
 
@@ -216,22 +228,59 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
         stream_version = get_stream_version(target_stream['tap_stream_id'], state)
         stream_md_map = metadata.to_map(target_stream['metadata'])
 
+
+        desired_columns = [c for c in target_stream['schema']['properties'].keys() if sync_common.should_sync_column(stream_md_map, c)]
+
         if c['kind'] == 'insert':
-            col_vals = c['columnvalues'] + [None]
-            col_names = c['columnnames'] + ['_sdc_deleted_at']
+            col_names = []
+            col_vals = []
+            for idx, col in enumerate(c['columnnames']):
+                if col in set(desired_columns):
+                    col_names.append(col)
+                    col_vals.append(c['columnvalues'][idx])
+
+            col_names = col_names + ['_sdc_deleted_at']
+            col_vals = col_vals + [None]
+            if conn_info.get('debug_lsn'):
+                col_names = col_names + ['_sdc_lsn']
+                col_vals = col_vals + [str(lsn)]
             record_message = row_to_singer_message(target_stream, col_vals, stream_version, col_names, time_extracted, stream_md_map, conn_info)
+
         elif c['kind'] == 'update':
-            col_vals = c['columnvalues'] + [None]
-            col_names = c['columnnames'] + ['_sdc_deleted_at']
+            col_names = []
+            col_vals = []
+            for idx, col in enumerate(c['columnnames']):
+                if col in set(desired_columns):
+                    col_names.append(col)
+                    col_vals.append(c['columnvalues'][idx])
+
+            col_names = col_names + ['_sdc_deleted_at']
+            col_vals = col_vals + [None]
+
+            if conn_info.get('debug_lsn'):
+                col_vals = col_vals + [str(lsn)]
+                col_names = col_names + ['_sdc_lsn']
             record_message = row_to_singer_message(target_stream, col_vals, stream_version, col_names, time_extracted, stream_md_map, conn_info)
+
         elif c['kind'] == 'delete':
-            col_names = c['oldkeys']['keynames'] + ['_sdc_deleted_at']
-            col_vals = c['oldkeys']['keyvalues']  + [singer.utils.strftime(time_extracted)]
+            col_names = []
+            col_vals = []
+            for idx, col in enumerate(c['oldkeys']['keynames']):
+                if col in set(desired_columns):
+                    col_names.append(col)
+                    col_vals.append(c['oldkeys']['keyvalues'][idx])
+
+
+            col_names = col_names + ['_sdc_deleted_at']
+            col_vals = col_vals  + [singer.utils.strftime(time_extracted)]
+            if conn_info.get('debug_lsn'):
+                col_vals = col_vals + [str(lsn)]
+                col_names = col_names + ['_sdc_lsn']
             record_message = row_to_singer_message(target_stream, col_vals, stream_version, col_names, time_extracted, stream_md_map, conn_info)
+
         else:
             raise Exception("unrecognized replication operation: {}".format(c['kind']))
 
-        sync_common.send_schema_message(target_stream, ['lsn'])
 
         singer.write_message(record_message)
         state = singer.write_bookmark(state,
@@ -241,7 +290,11 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
         LOGGER.debug("sending feedback to server with NO flush_lsn. just a keep-alive")
         msg.cursor.send_feedback()
 
+
     LOGGER.debug("sending feedback to server. flush_lsn = %s", msg.data_start)
+    if msg.data_start > end_lsn:
+        raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
+
     msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
 
@@ -265,46 +318,63 @@ def locate_replication_slot(conn_info):
             raise Exception("Unable to find replication slot (stitch || {} with wal2json".format(db_specific_slot))
 
 
-def sync_tables(conn_info, logical_streams, state):
+def sync_tables(conn_info, logical_streams, state, end_lsn):
     start_lsn = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
-    end_lsn = fetch_current_lsn(conn_info)
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
+    last_lsn_processed = None
+    poll_total_seconds = conn_info['logical_poll_total_seconds'] or 60 * 30  #we are willing to poll for a total of 30 minutes without finding a record
+    keep_alive_time = 10.0
+    begin_ts = datetime.datetime.now()
+
+    for s in logical_streams:
+        sync_common.send_schema_message(s, ['lsn'])
 
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
-
-            LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn)
+            LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, poll_total_seconds)
             try:
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
-            cur.send_feedback(flush_lsn=start_lsn)
-            keepalive_interval = 10.0
             rows_saved = 0
             while True:
+                poll_duration = (datetime.datetime.now() - begin_ts).total_seconds()
+                if poll_duration > poll_total_seconds:
+                    LOGGER.info("breaking after %s seconds of polling with no data", poll_duration)
+                    break
+
                 msg = cur.read_message()
                 if msg:
-                    state = consume_message(logical_streams, state, msg, time_extracted, conn_info)
+                    begin_ts = datetime.datetime.now()
+                    if msg.data_start > end_lsn:
+                        LOGGER.info("gone past end_lsn %s for run. breaking", end_lsn)
+                        break
 
+                    state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
+                    #msg has been consumed. it has been processed
+                    last_lsn_processed = msg.data_start
                     rows_saved = rows_saved + 1
                     if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
                 else:
                     now = datetime.datetime.now()
-                    timeout = keepalive_interval - (now - cur.io_timestamp).total_seconds()
+                    timeout = keep_alive_time - (now - cur.io_timestamp).total_seconds()
                     try:
                         sel = select([cur], [], [], max(0, timeout))
                         if not any(sel):
-                            break
+                            LOGGER.info("no data for %s seconds. sending feedback to server with NO flush_lsn. just a keep-alive", timeout)
+                            cur.send_feedback()
+
                     except InterruptedError:
                         pass  # recalculate timeout and continue
 
-    for s in logical_streams:
-        LOGGER.info("updating bookmark for stream %s to end_lsn %s", s['tap_stream_id'], end_lsn)
-        state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', end_lsn)
+    if last_lsn_processed:
+        for s in logical_streams:
+            LOGGER.info("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
+            state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', last_lsn_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
     return state
