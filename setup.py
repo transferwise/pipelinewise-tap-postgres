@@ -7,7 +7,10 @@ setup(name='pipelinewise-tap-postgres',
       description='Singer.io tap for extracting data from PostgreSQL - PipelineWise compatible',
       author='Stitch',
       url='https://github.com/transferwise/pipelinewise-tap-postgres',
-      classifiers=['Programming Language :: Python :: 3 :: Only'],
+      classifiers=[
+          'License :: OSI Approved :: GNU Affero General Public License v3',
+          'Programming Language :: Python :: 3 :: Only'
+      ],
       install_requires=[
           'singer-python==5.3.1',
           'psycopg2==2.7.4',
