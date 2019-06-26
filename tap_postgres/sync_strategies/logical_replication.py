@@ -295,8 +295,8 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     if msg.data_start > end_lsn:
         raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
 
-    msg.cursor.send_feedback(flush_lsn=msg.data_start)
-
+    # Flush Postgres log up to lsn received in current run
+    # msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
     return state
 
@@ -323,8 +323,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     last_lsn_processed = None
-    poll_total_seconds = conn_info['logical_poll_total_seconds'] or 60 * 30  #we are willing to poll for a total of 30 minutes without finding a record
-    keep_alive_time = 10.0
+    #When no data is received, poll every 5 seconds for 15 seconds total
+    keep_alive_time = 5.0
+    poll_total_seconds = conn_info['logical_poll_total_seconds'] or 15
     begin_ts = datetime.datetime.now()
 
     for s in logical_streams:
@@ -337,6 +338,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
+
+            # Flush Postgres log up to lsn saved in state file from previous run
+            cur.send_feedback(flush_lsn=start_lsn)
 
             rows_saved = 0
             while True:
