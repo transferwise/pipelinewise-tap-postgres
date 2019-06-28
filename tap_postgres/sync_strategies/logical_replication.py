@@ -18,7 +18,7 @@ import re
 
 LOGGER = singer.get_logger()
 
-UPDATE_BOOKMARK_PERIOD = 1000
+UPDATE_BOOKMARK_PERIOD = 20000
 
 def get_pg_version(cur):
     cur.execute("SELECT version()")
@@ -332,7 +332,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             # Flush Postgres log up to lsn saved in state file from previous run
             cur.send_feedback(flush_lsn=start_lsn)
 
-            rows_saved = 0
+            wal_entries_processed = 0
             while True:
                 poll_duration = (datetime.datetime.now() - begin_ts).total_seconds()
                 if poll_duration > poll_total_seconds:
@@ -349,8 +349,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
                     #msg has been consumed. it has been processed
                     last_lsn_processed = msg.data_start
-                    rows_saved = rows_saved + 1
-                    if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
+                    wal_entries_processed = wal_entries_processed + 1
+                    if wal_entries_processed % UPDATE_BOOKMARK_PERIOD == 0:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
                 else:
