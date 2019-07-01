@@ -9,6 +9,7 @@ setup(name='pipelinewise-tap-postgres',
       version='1.0.7',
       description='Singer.io tap for extracting data from PostgreSQL - PipelineWise compatible',
       long_description=long_description,
+      long_description_content_type='text/markdown',
       author='Stitch',
       url='https://github.com/transferwise/pipelinewise-tap-postgres',
       classifiers=[
