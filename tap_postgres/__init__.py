@@ -100,7 +100,7 @@ def schema_for_column_datatype(c):
         return schema
 
     if data_type in JSON_TYPES:
-        schema['type'] = nullable_column('string', c.is_primary_key)
+        schema['type'] = nullable_column('object', c.is_primary_key)
         return schema
 
     if data_type == 'numeric':
@@ -195,9 +195,9 @@ def schema_for_column(c):
     elif c.sql_data_type == 'inet[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_string_array'}
     elif c.sql_data_type == 'json[]':
-        column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_string_array'}
+        column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_object_array'}
     elif c.sql_data_type == 'jsonb[]':
-        column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_string_array'}
+        column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_object_array'}
     elif c.sql_data_type == 'mac[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_string_array'}
     elif c.sql_data_type == 'money[]':
@@ -623,7 +623,7 @@ def register_type_adapters(conn_config):
                 psycopg2.extensions.new_array_type(
                     (money_array_oid,), 'MONEY[]', psycopg2.STRING))
 
-            #json and jsbon
+            #json and jsonb
             psycopg2.extras.register_default_json(loads=lambda x: str(x))
             psycopg2.extras.register_default_jsonb(loads=lambda x: str(x))
 
