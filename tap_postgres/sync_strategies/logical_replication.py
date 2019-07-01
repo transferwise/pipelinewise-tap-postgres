@@ -18,16 +18,12 @@ import re
 
 LOGGER = singer.get_logger()
 
-UPDATE_BOOKMARK_PERIOD = 1000
+UPDATE_BOOKMARK_PERIOD = 20000
 
 def get_pg_version(cur):
     cur.execute("SELECT version()")
-    res = cur.fetchone()[0]
-    version_match = re.match('PostgreSQL (\d+)', res)
-    if not version_match:
-        raise Exception('unable to determine PostgreSQL version from {}'.format(res))
-
-    version = int(version_match.group(1))
+    cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
+    version = cur.fetchone()[0]
     LOGGER.info("Detected PostgresSQL version: %s", version)
     return version
 
@@ -35,12 +31,12 @@ def fetch_current_lsn(conn_config):
     with post_db.open_connection(conn_config, False) as conn:
         with conn.cursor() as cur:
             version = get_pg_version(cur)
-            if version == 9:
-                cur.execute("SELECT pg_current_xlog_location()")
-            elif version > 9:
-                cur.execute("SELECT pg_current_wal_lsn()")
+            if version >= 100000:
+                cur.execute("SELECT pg_current_wal_lsn() AS current_lsn")
+            elif version >= 90400:
+                cur.execute("SELECT pg_current_xlog_location() AS current_lsn")
             else:
-                raise Exception('unable to fetch current lsn for PostgresQL version {}'.format(version))
+                raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
 
             current_lsn = cur.fetchone()[0]
             file, index = current_lsn.split('/')
@@ -309,13 +305,7 @@ def locate_replication_slot(conn_info):
                 LOGGER.info("using pg_replication_slot %s", db_specific_slot)
                 return db_specific_slot
 
-
-            cur.execute("SELECT * FROM pg_replication_slots WHERE slot_name = 'stitch' AND plugin = 'wal2json'")
-            if len(cur.fetchall()) == 1:
-                LOGGER.info("using pg_replication_slot 'stitch'")
-                return 'stitch'
-
-            raise Exception("Unable to find replication slot (stitch || {} with wal2json".format(db_specific_slot))
+            raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
 
 
 def sync_tables(conn_info, logical_streams, state, end_lsn):
@@ -342,7 +332,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             # Flush Postgres log up to lsn saved in state file from previous run
             cur.send_feedback(flush_lsn=start_lsn)
 
-            rows_saved = 0
+            wal_entries_processed = 0
             while True:
                 poll_duration = (datetime.datetime.now() - begin_ts).total_seconds()
                 if poll_duration > poll_total_seconds:
@@ -359,8 +349,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
                     #msg has been consumed. it has been processed
                     last_lsn_processed = msg.data_start
-                    rows_saved = rows_saved + 1
-                    if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
+                    wal_entries_processed = wal_entries_processed + 1
+                    if wal_entries_processed % UPDATE_BOOKMARK_PERIOD == 0:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
                 else:
