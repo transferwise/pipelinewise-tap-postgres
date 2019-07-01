@@ -2,9 +2,13 @@
 
 from setuptools import setup
 
+with open('README.md') as f:
+      long_description = f.read()
+
 setup(name='pipelinewise-tap-postgres',
       version='1.0.5',
       description='Singer.io tap for extracting data from PostgreSQL - PipelineWise compatible',
+      long_description=long_description,
       author='Stitch',
       url='https://github.com/transferwise/pipelinewise-tap-postgres',
       classifiers=[
