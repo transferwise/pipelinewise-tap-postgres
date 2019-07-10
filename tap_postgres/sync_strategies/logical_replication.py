@@ -33,7 +33,7 @@ def fetch_current_lsn(conn_config):
             version = get_pg_version(cur)
             if version >= 100000:
                 cur.execute("SELECT pg_current_wal_lsn() AS current_lsn")
-            elif version >= 90400:
+            elif version >= 90600:
                 cur.execute("SELECT pg_current_xlog_location() AS current_lsn")
             else:
                 raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
@@ -142,8 +142,8 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
     if sql_datatype == 'timestamp with time zone':
         if isinstance(elem, datetime.datetime):
             return elem.isoformat()
-
-        return parse(elem).isoformat()
+        else:
+            return parse(elem).isoformat()
     if sql_datatype == 'date':
         if  isinstance(elem, datetime.date):
             #logical replication gives us dates as strings UNLESS they from an array
@@ -173,16 +173,16 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
 def selected_array_to_singer_value(elem, sql_datatype, conn_info):
     if isinstance(elem, list):
         return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, conn_info), elem))
-
-    return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
+    else:
+        return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
 
 def selected_value_to_singer_value(elem, sql_datatype, conn_info):
     #are we dealing with an array?
     if sql_datatype.find('[]') > 0:
         cleaned_elem = create_array_elem(elem, sql_datatype, conn_info)
         return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, conn_info), (cleaned_elem or [])))
-
-    return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
+    else:
+        return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
 
 def row_to_singer_message(stream, row, version, columns, time_extracted, md_map, conn_info):
     row_to_persist = ()
@@ -223,7 +223,6 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
         target_stream = streams_lookup[tap_stream_id]
         stream_version = get_stream_version(target_stream['tap_stream_id'], state)
         stream_md_map = metadata.to_map(target_stream['metadata'])
-
 
         desired_columns = [c for c in target_stream['schema']['properties'].keys() if sync_common.should_sync_column(stream_md_map, c)]
 
@@ -279,19 +278,16 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
 
 
         singer.write_message(record_message)
-        state = singer.write_bookmark(state,
-                                      target_stream['tap_stream_id'],
-                                      'lsn',
-                                      lsn)
+        state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
         LOGGER.debug("sending feedback to server with NO flush_lsn. just a keep-alive")
         msg.cursor.send_feedback()
 
 
-    LOGGER.debug("sending feedback to server. flush_lsn = %s", msg.data_start)
     if msg.data_start > end_lsn:
         raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
 
     # Flush Postgres log up to lsn received in current run
+    # LOGGER.debug("sending feedback to server. flush_lsn = %s", msg.data_start)
     # msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
     return state
@@ -304,8 +300,8 @@ def locate_replication_slot(conn_info):
             if len(cur.fetchall()) == 1:
                 LOGGER.info("using pg_replication_slot %s", db_specific_slot)
                 return db_specific_slot
-
-            raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
+            else:
+                raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
 
 
 def sync_tables(conn_info, logical_streams, state, end_lsn):
@@ -330,6 +326,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
+            LOGGER.debug("sending feedback to server. flush_lsn = %s", start_lsn)
             cur.send_feedback(flush_lsn=start_lsn)
 
             wal_entries_processed = 0
