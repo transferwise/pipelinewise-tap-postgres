@@ -346,8 +346,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
                     last_lsn_processed = msg.data_start
                     wal_entries_processed = wal_entries_processed + 1
-                    if wal_entries_processed % UPDATE_BOOKMARK_PERIOD == 0:
+                    if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+                        wal_entries_processed = 0
 
                 else:
                     now = datetime.datetime.now()
