@@ -24,7 +24,7 @@ def get_pg_version(cur):
     cur.execute("SELECT version()")
     cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
     version = cur.fetchone()[0]
-    LOGGER.info("Detected PostgresSQL version: %s", version)
+    LOGGER.debug("Detected PostgresSQL version: %s", version)
     return version
 
 def fetch_current_lsn(conn_config):
@@ -45,10 +45,10 @@ def fetch_current_lsn(conn_config):
 def add_automatic_properties(stream, conn_config):
     stream['schema']['properties']['_sdc_deleted_at'] = {'type' : ['null', 'string'], 'format' :'date-time'}
     if conn_config.get('debug_lsn'):
-        LOGGER.info('debug_lsn is ON')
+        LOGGER.debug('debug_lsn is ON')
         stream['schema']['properties']['_sdc_lsn'] = {'type' : ['null', 'string']}
     else:
-        LOGGER.info('debug_lsn is OFF')
+        LOGGER.debug('debug_lsn is OFF')
 
     return stream
 
@@ -279,7 +279,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
 
         singer.write_message(record_message)
         state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
-        LOGGER.debug("sending feedback to server with NO flush_lsn. just a keep-alive")
+        LOGGER.info("sending feedback to server with NO flush_lsn. just a keep-alive")
         msg.cursor.send_feedback()
 
 
@@ -287,7 +287,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
         raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
 
     # Flush Postgres log up to lsn received in current run
-    # LOGGER.debug("sending feedback to server. flush_lsn = %s", msg.data_start)
+    # LOGGER.info("Sending feedback to server with flush_lsn = %s", msg.data_start)
     # msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
     return state
@@ -326,7 +326,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.debug("sending feedback to server. flush_lsn = %s", start_lsn)
+            LOGGER.info("Sending feedback to server with flush_lsn = %s", start_lsn)
             cur.send_feedback(flush_lsn=start_lsn)
 
             wal_entries_processed = 0
@@ -364,7 +364,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
     if last_lsn_processed:
         for s in logical_streams:
-            LOGGER.info("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
+            LOGGER.debug("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
             state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', last_lsn_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
