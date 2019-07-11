@@ -279,7 +279,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
 
         singer.write_message(record_message)
         state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
-        LOGGER.info("sending feedback to server with NO flush_lsn. just a keep-alive")
+        LOGGER.info("Sending feedback to server with NO flush_lsn. just a keep-alive")
         msg.cursor.send_feedback()
 
 
@@ -298,7 +298,7 @@ def locate_replication_slot(conn_info):
             db_specific_slot = "stitch_{}".format(conn_info['dbname'])
             cur.execute("SELECT * FROM pg_replication_slots WHERE slot_name = %s AND plugin = %s", (db_specific_slot, 'wal2json'))
             if len(cur.fetchall()) == 1:
-                LOGGER.info("using pg_replication_slot %s", db_specific_slot)
+                LOGGER.info("Using pg_replication_slot %s", db_specific_slot)
                 return db_specific_slot
             else:
                 raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
@@ -333,14 +333,14 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             while True:
                 poll_duration = (datetime.datetime.now() - begin_ts).total_seconds()
                 if poll_duration > poll_total_seconds:
-                    LOGGER.info("breaking after %s seconds of polling with no data", poll_duration)
+                    LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
                     break
 
                 msg = cur.read_message()
                 if msg:
                     begin_ts = datetime.datetime.now()
                     if msg.data_start > end_lsn:
-                        LOGGER.info("gone past end_lsn %s for run. breaking", end_lsn)
+                        LOGGER.info("Gone past end_lsn %s for run. breaking", end_lsn)
                         break
 
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
@@ -356,7 +356,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     try:
                         sel = select([cur], [], [], max(0, timeout))
                         if not any(sel):
-                            LOGGER.info("no data for %s seconds. sending feedback to server with NO flush_lsn. just a keep-alive", timeout)
+                            LOGGER.info("No data for %s seconds. Sending feedback to server with NO flush_lsn. Just a keep-alive", timeout)
                             cur.send_feedback()
 
                     except InterruptedError:
