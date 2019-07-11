@@ -279,7 +279,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
 
         singer.write_message(record_message)
         state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
-        LOGGER.info("Sending feedback to server with NO flush_lsn. just a keep-alive")
+        LOGGER.debug("Sending keep-alive to server with NO flush_lsn")
         msg.cursor.send_feedback()
 
 
@@ -344,7 +344,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                         break
 
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
-                    #msg has been consumed. it has been processed
                     last_lsn_processed = msg.data_start
                     wal_entries_processed = wal_entries_processed + 1
                     if wal_entries_processed % UPDATE_BOOKMARK_PERIOD == 0:
@@ -356,7 +355,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     try:
                         sel = select([cur], [], [], max(0, timeout))
                         if not any(sel):
-                            LOGGER.info("No data for %s seconds. Sending feedback to server with NO flush_lsn. Just a keep-alive", timeout)
+                            LOGGER.info("No data for %s seconds. Sending keep-alive to server with NO flush_lsn", timeout)
                             cur.send_feedback()
 
                     except InterruptedError:
