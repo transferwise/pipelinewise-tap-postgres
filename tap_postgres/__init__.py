@@ -651,9 +651,9 @@ def do_sync(conn_config, catalog, default_replication_method, state):
     streams.sort(key=lambda s: s['tap_stream_id'])
     LOGGER.info("Selected streams: %s ", list(map(lambda s: s['tap_stream_id'], streams)))
     if any_logical_streams(streams, default_replication_method):
-        LOGGER.info("Use of logical replication requires fetching an lsn...")
+        # Use of logical replication requires fetching an lsn
         end_lsn = logical_replication.fetch_current_lsn(conn_config)
-        LOGGER.info("End LSN: %s ", end_lsn)
+        LOGGER.info("end_lsn = %s ", end_lsn)
     else:
         end_lsn = None
 
@@ -667,7 +667,7 @@ def do_sync(conn_config, catalog, default_replication_method, state):
         other_streams = list(filter(lambda s: s['tap_stream_id'] != currently_syncing, traditional_streams))
         traditional_streams = currently_syncing_stream + other_streams
     else:
-        LOGGER.info("No currently_syncing found")
+        LOGGER.info("No streams marked as currently_syncing in state file")
 
     for stream in traditional_streams:
         state = sync_traditional_stream(conn_config, stream, state, sync_method_lookup[stream['tap_stream_id']], end_lsn)
