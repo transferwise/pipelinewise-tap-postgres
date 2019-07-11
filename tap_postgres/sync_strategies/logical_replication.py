@@ -310,7 +310,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     slot = locate_replication_slot(conn_info)
     last_lsn_processed = None
     #When no data is received, poll every 5 seconds for 15 seconds total
-    keep_alive_time = 5.0
+    poll_interval = 5.0
     poll_total_seconds = conn_info['logical_poll_total_seconds'] or 15
     begin_ts = datetime.datetime.now()
 
@@ -352,7 +352,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
                 else:
                     now = datetime.datetime.now()
-                    timeout = keep_alive_time - (now - cur.io_timestamp).total_seconds()
+                    timeout = poll_interval - (now - cur.io_timestamp).total_seconds()
                     try:
                         sel = select([cur], [], [], max(0, timeout))
                         if not any(sel):
