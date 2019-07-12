@@ -21,7 +21,6 @@ LOGGER = singer.get_logger()
 UPDATE_BOOKMARK_PERIOD = 20000
 
 def get_pg_version(cur):
-    cur.execute("SELECT version()")
     cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
     version = cur.fetchone()[0]
     LOGGER.debug("Detected PostgresSQL version: %s", version)
