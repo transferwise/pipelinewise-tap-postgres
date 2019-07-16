@@ -23,19 +23,36 @@ UPDATE_BOOKMARK_PERIOD = 20000
 def get_pg_version(cur):
     cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
     version = cur.fetchone()[0]
-    LOGGER.debug("Detected PostgresSQL version: %s", version)
+    LOGGER.debug("Detected PostgreSQL version: %s", version)
     return version
 
 def fetch_current_lsn(conn_config):
     with post_db.open_connection(conn_config, False) as conn:
         with conn.cursor() as cur:
+            # Make sure PostgreSQL version is 9.4 or higher
             version = get_pg_version(cur)
+
+            # Do not allow minor versions with PostgreSQL BUG #15114
+            if (version >= 110000) and (version < 110002):
+                raise Exception('PostgreSQL upgrade required to minor version 11.2')
+            elif (version >= 100000) and (version < 100007):
+                raise Exception('PostgreSQL upgrade required to minor version 10.7')
+            elif (version >= 90600) and (version < 90612):
+                raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
+            elif (version >= 90500) and (version < 90516):
+                raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
+            elif (version >= 90400) and (version < 90421):
+                raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
+            elif (version < 90400):
+                raise Exception('Logical replication not supported before PostgreSQL 9.4')
+
+            # Use version specific lsn command
             if version >= 100000:
                 cur.execute("SELECT pg_current_wal_lsn() AS current_lsn")
-            elif version >= 90600:
+            elif version >= 90400:
                 cur.execute("SELECT pg_current_xlog_location() AS current_lsn")
             else:
-                raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
+                raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
             current_lsn = cur.fetchone()[0]
             file, index = current_lsn.split('/')
