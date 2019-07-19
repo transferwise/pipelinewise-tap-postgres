@@ -326,9 +326,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     poll_interval = 5.0
     poll_total_seconds = conn_info['logical_poll_total_seconds'] or 15
     begin_timestamp = datetime.datetime.now()
-    # When data is received, send feedback to keep connection open
-    feedback_interval = 5.0
-    feedback_timestamp = datetime.datetime.now()
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
@@ -337,7 +334,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
         with conn.cursor() as cur:
             LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, poll_total_seconds)
             try:
-                cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn)
+                cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, status_interval=10)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
@@ -365,12 +362,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
                         wal_entries_processed = 0
-
-                    # Keep connection to server alive
-                    if datetime.datetime.now() >= (feedback_timestamp + datetime.timedelta(seconds=feedback_interval)):
-                        LOGGER.debug("Sending keep-alive to server with NO flush_lsn")
-                        msg.cursor.send_feedback()
-                        feedback_timestamp = datetime.datetime.now()
 
                 else:
                     now = datetime.datetime.now()
