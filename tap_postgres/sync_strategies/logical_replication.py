@@ -10,8 +10,9 @@ import tap_postgres.db as post_db
 import tap_postgres.sync_strategies.common as sync_common
 from dateutil.parser import parse
 import psycopg2
+from psycopg2.extras import REPLICATION_LOGICALfrom select import
 import copy
-from select import select
+ select
 from functools import reduce
 import json
 import re
@@ -322,8 +323,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     last_lsn_processed = None
-    #When no data is received, poll every 5 seconds for 15 seconds total
-    poll_interval = 5.0
+    #When no data is received for poll_total_seconds, disconnect
     poll_total_seconds = conn_info['logical_poll_total_seconds'] or 15
     begin_timestamp = datetime.datetime.now()
 
@@ -334,7 +334,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
         with conn.cursor() as cur:
             LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, poll_total_seconds)
             try:
-                cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, status_interval=10)
+                cur.start_replication(slot_name=slot, slot_type=REPLICATION_LOGICAL, start_lsn=start_lsn, decode=True, status_interval=10)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
@@ -362,18 +362,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
                         wal_entries_processed = 0
-
-                else:
-                    now = datetime.datetime.now()
-                    timeout = poll_interval - (now - cur.io_timestamp).total_seconds()
-                    try:
-                        sel = select([cur], [], [], max(0, timeout))
-                        if not any(sel):
-                            LOGGER.info("No data for %s seconds. Sending keep-alive to server with NO flush_lsn", timeout)
-                            cur.send_feedback()
-
-                    except InterruptedError:
-                        pass  # recalculate timeout and continue
 
     if last_lsn_processed:
         for s in logical_streams:
