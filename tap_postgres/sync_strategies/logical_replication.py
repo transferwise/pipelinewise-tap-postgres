@@ -10,9 +10,9 @@ import tap_postgres.db as post_db
 import tap_postgres.sync_strategies.common as sync_common
 from dateutil.parser import parse
 import psycopg2
-from psycopg2.extras import REPLICATION_LOGICALfrom select import
+from psycopg2.extras import REPLICATION_LOGICAL
 import copy
- select
+ from select import select
 from functools import reduce
 import json
 import re
