@@ -332,15 +332,15 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
-            # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("Sending feedback to server with flush_lsn = %s", comitted_lsn)
-            cur.send_feedback(flush_lsn=comitted_lsn)
-
             LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. logical_poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, logical_poll_total_seconds)
             try:
                 cur.start_replication(slot_name=slot, slot_type=REPLICATION_LOGICAL, start_lsn=start_lsn, decode=True, status_interval=10)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
+
+            # Flush Postgres log up to lsn saved in state file from previous run
+            LOGGER.info("Sending feedback to server with flush_lsn = %s", comitted_lsn)
+            cur.send_feedback(flush_lsn=comitted_lsn, reply=True, force=True)
 
             wal_entries_processed = 0
             while True:
@@ -366,7 +366,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
     if last_lsn_processed:
         for s in logical_streams:
-            LOGGER.debug("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
+            LOGGER.info("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
             state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', last_lsn_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
