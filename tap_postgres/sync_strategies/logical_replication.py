@@ -12,7 +12,7 @@ from dateutil.parser import parse
 import psycopg2
 from psycopg2.extras import REPLICATION_LOGICAL
 import copy
- from select import select
+from select import select
 from functools import reduce
 import json
 import re
