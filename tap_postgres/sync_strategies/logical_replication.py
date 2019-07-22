@@ -10,7 +10,6 @@ import tap_postgres.db as post_db
 import tap_postgres.sync_strategies.common as sync_common
 from dateutil.parser import parse
 import psycopg2
-from psycopg2.extras import REPLICATION_LOGICAL
 import copy
 from select import select
 from functools import reduce
@@ -225,6 +224,8 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         time_extracted=time_extracted)
 
 def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
+    global poll_interval
+    global poll_timestamp
     payload = json.loads(msg.payload)
     lsn = msg.data_start
 
@@ -233,6 +234,13 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
         streams_lookup[s['tap_stream_id']] = s
 
     for c in payload['change']:
+
+        # Keep connection to server alive
+        if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+            LOGGER.info("{} : Sending keep-alive to server - during wal entry processing".format(datetime.datetime.now()))
+            msg.cursor.send_feedback()
+            poll_timestamp = datetime.datetime.now()
+
         tap_stream_id = post_db.compute_tap_stream_id(conn_info['dbname'], c['schema'], c['table'])
         if streams_lookup.get(tap_stream_id) is None:
             continue
@@ -325,7 +333,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     slot = locate_replication_slot(conn_info)
     last_lsn_processed = None
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 1800
-    begin_timestamp = datetime.datetime.now()
+    global poll_interval
+    global poll_timestamp
+    poll_interval = 10
+    poll_timestamp = datetime.datetime.now()
+    wal_received_timestamp = datetime.datetime.now()
+    wal_entries_processed = 0
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
@@ -334,26 +347,25 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
         with conn.cursor() as cur:
             LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. logical_poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, logical_poll_total_seconds)
             try:
-                cur.start_replication(slot_name=slot, slot_type=REPLICATION_LOGICAL, start_lsn=start_lsn, decode=True, status_interval=10)
+                cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
             LOGGER.info("Sending feedback to server with flush_lsn = %s", comitted_lsn)
-            cur.send_feedback(flush_lsn=comitted_lsn, reply=True, force=True)
+            cur.send_feedback(flush_lsn=comitted_lsn)
 
-            wal_entries_processed = 0
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
                 # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
-                poll_duration = (datetime.datetime.now() - begin_timestamp).total_seconds()
+                poll_duration = (datetime.datetime.now() - wal_received_timestamp).total_seconds()
                 if poll_duration > logical_poll_total_seconds:
                     LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
                     break
 
                 msg = cur.read_message()
                 if msg:
-                    begin_timestamp = datetime.datetime.now()
+                    wal_received_timestamp = datetime.datetime.now()
                     if msg.data_start > end_lsn:
                         LOGGER.info("Gone past end_lsn %s for run. breaking", end_lsn)
                         break
@@ -364,6 +376,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
                         wal_entries_processed = 0
+
+                # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
+                if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+                    LOGGER.info("{} : Sending keep-alive to server - between wal entries".format(datetime.datetime.now()))
+                    cur.send_feedback()
+                    poll_timestamp = datetime.datetime.now()
 
     if last_lsn_processed:
         for s in logical_streams:
