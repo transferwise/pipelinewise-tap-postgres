@@ -332,7 +332,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     last_lsn_processed = None
-    logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 1800
+    logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 600
     global poll_interval
     global poll_timestamp
     poll_interval = 10
