@@ -224,6 +224,8 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         time_extracted=time_extracted)
 
 def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
+    global poll_interval
+    global poll_timestamp
     payload = json.loads(msg.payload)
     lsn = msg.data_start
 
@@ -232,6 +234,13 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
         streams_lookup[s['tap_stream_id']] = s
 
     for c in payload['change']:
+
+        # Keep connection to server alive
+        if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+            LOGGER.info("{} : Sending keep-alive to source server - currently processing wal entry".format(datetime.datetime.utcnow()))
+            msg.cursor.send_feedback()
+            poll_timestamp = datetime.datetime.now()
+
         tap_stream_id = post_db.compute_tap_stream_id(conn_info['dbname'], c['schema'], c['table'])
         if streams_lookup.get(tap_stream_id) is None:
             continue
@@ -318,43 +327,45 @@ def locate_replication_slot(conn_info):
 
 
 def sync_tables(conn_info, logical_streams, state, end_lsn):
-    start_lsn = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
+    comitted_lsn = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
+    start_lsn = comitted_lsn
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     last_lsn_processed = None
-    #When no data is received, poll every 5 seconds for 15 seconds total
-    poll_interval = 5.0
-    poll_total_seconds = conn_info['logical_poll_total_seconds'] or 15
-    begin_timestamp = datetime.datetime.now()
-    # When data is received, send feedback to keep connection open
-    feedback_interval = 5.0
-    feedback_timestamp = datetime.datetime.now()
+    logical_poll_total_seconds = conn_info.get('logical_poll_total_seconds', 600)
+    global poll_interval
+    global poll_timestamp
+    poll_interval = 10
+    poll_timestamp = datetime.datetime.now()
+    wal_received_timestamp = datetime.datetime.now()
+    wal_entries_processed = 0
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
 
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
-            LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, poll_total_seconds)
+            LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. logical_poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, logical_poll_total_seconds)
             try:
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn)
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("Sending feedback to server with flush_lsn = %s", start_lsn)
-            cur.send_feedback(flush_lsn=start_lsn)
+            LOGGER.info("Sending flush_lsn = {} to source server".format(comitted_lsn))
+            cur.send_feedback(flush_lsn=comitted_lsn)
 
-            wal_entries_processed = 0
             while True:
-                poll_duration = (datetime.datetime.now() - begin_timestamp).total_seconds()
-                if poll_duration > poll_total_seconds:
+                # Disconnect when no data received for logical_poll_total_seconds
+                # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
+                poll_duration = (datetime.datetime.now() - wal_received_timestamp).total_seconds()
+                if poll_duration > logical_poll_total_seconds:
                     LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
                     break
 
                 msg = cur.read_message()
                 if msg:
-                    begin_timestamp = datetime.datetime.now()
+                    wal_received_timestamp = datetime.datetime.now()
                     if msg.data_start > end_lsn:
                         LOGGER.info("Gone past end_lsn %s for run. breaking", end_lsn)
                         break
@@ -366,27 +377,15 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
                         wal_entries_processed = 0
 
-                    # Keep connection to server alive
-                    if datetime.datetime.now() >= (feedback_timestamp + datetime.timedelta(seconds=feedback_interval)):
-                        LOGGER.debug("Sending keep-alive to server with NO flush_lsn")
-                        msg.cursor.send_feedback()
-                        feedback_timestamp = datetime.datetime.now()
-
-                else:
-                    now = datetime.datetime.now()
-                    timeout = poll_interval - (now - cur.io_timestamp).total_seconds()
-                    try:
-                        sel = select([cur], [], [], max(0, timeout))
-                        if not any(sel):
-                            LOGGER.info("No data for %s seconds. Sending keep-alive to server with NO flush_lsn", timeout)
-                            cur.send_feedback()
-
-                    except InterruptedError:
-                        pass  # recalculate timeout and continue
+                # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
+                if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+                    LOGGER.info("{} : Sending keep-alive to source server - currently waiting for wal entries".format(datetime.datetime.utcnow()))
+                    cur.send_feedback()
+                    poll_timestamp = datetime.datetime.now()
 
     if last_lsn_processed:
         for s in logical_streams:
-            LOGGER.debug("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
+            LOGGER.info("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
             state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', last_lsn_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
