@@ -237,7 +237,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
 
         # Keep connection to server alive
         if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-            LOGGER.info("{} : Sending keep-alive to server - during wal entry processing".format(datetime.datetime.now()))
+            LOGGER.info("{} : Sending keep-alive to source server - currently processing wal entry".format(datetime.datetime.utcnow()))
             msg.cursor.send_feedback()
             poll_timestamp = datetime.datetime.now()
 
@@ -352,7 +352,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("Sending feedback to server with flush_lsn = %s", comitted_lsn)
+            LOGGER.info("Sending flush_lsn = {} to source server".format(comitted_lsn))
             cur.send_feedback(flush_lsn=comitted_lsn)
 
             while True:
@@ -379,7 +379,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
                 # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
                 if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-                    LOGGER.info("{} : Sending keep-alive to server - between wal entries".format(datetime.datetime.now()))
+                    LOGGER.info("{} : Sending keep-alive to source server - currently waiting for wal entries".format(datetime.datetime.utcnow()))
                     cur.send_feedback()
                     poll_timestamp = datetime.datetime.now()
 
