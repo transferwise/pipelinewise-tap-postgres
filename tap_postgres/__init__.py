@@ -687,7 +687,8 @@ def main_impl():
                    'dbname'   : args.config['dbname'],
                    'filter_dbs' : args.config.get('filter_dbs'),
                    'filter_schemas' : args.config.get('filter_schemas'),
-                   'debug_lsn' : args.config.get('debug_lsn') == 'true'
+                   'debug_lsn' : args.config.get('debug_lsn') == 'true',
+                   'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))
                    }
 
     if args.config.get('ssl') == 'true':
