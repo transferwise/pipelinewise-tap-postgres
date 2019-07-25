@@ -18,7 +18,7 @@ import re
 
 LOGGER = singer.get_logger()
 
-UPDATE_BOOKMARK_PERIOD = 20000
+UPDATE_BOOKMARK_PERIOD = 25000
 
 def get_pg_version(cur):
     cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
@@ -328,9 +328,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     last_lsn_processed = None
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 600
     poll_interval = 10
-    poll_timestamp = datetime.datetime.now()
     wal_received_timestamp = datetime.datetime.now()
-    rows_processed = 0
+    wal_entries_processed = 0
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
@@ -339,7 +338,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
         with conn.cursor() as cur:
             LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. logical_poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, logical_poll_total_seconds)
             try:
-                cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
+                cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, status_interval=poll_interval, options={'write-in-chunks': 1})
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
@@ -364,16 +363,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
                     last_lsn_processed = msg.data_start
-                    rows_processed = rows_processed + 1
-                    if rows_processed >= UPDATE_BOOKMARK_PERIOD:
+                    wal_entries_processed = wal_entries_processed + 1
+                    if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-                        rows_processed = 0
-
-                # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
-                if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-                    LOGGER.info("{} : Sending keep-alive to source server".format(datetime.datetime.utcnow()))
-                    cur.send_feedback()
-                    poll_timestamp = datetime.datetime.now()
+                        wal_entries_processed = 0
 
     if last_lsn_processed:
         for s in logical_streams:
