@@ -302,7 +302,10 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
         raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
 
     # Flush Postgres log up to lsn received in current run
-    # LOGGER.info("Sending feedback to server with flush_lsn = %s", msg.data_start)
+    # This is the behaviour of the original tap-progres
+    # The Pipelinewise version flushes only at the start of the next run
+    # This is to ensure the data has been comitted on the destination
+    # LOGGER.info("Sending flush_lsn = {} to source server".format(msg.data_start))
     # msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
     return state
