@@ -18,7 +18,7 @@ import re
 
 LOGGER = singer.get_logger()
 
-UPDATE_BOOKMARK_PERIOD = 25000
+UPDATE_BOOKMARK_PERIOD = 10000
 
 def get_pg_version(cur):
     cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
