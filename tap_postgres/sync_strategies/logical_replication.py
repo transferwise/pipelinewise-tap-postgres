@@ -27,6 +27,11 @@ def get_pg_version(cur):
     LOGGER.debug("Detected PostgreSQL version: %s", version)
     return version
 
+def lsn_to_int(f_lsn):
+    """Convert pg_lsn format to int"""
+    file, index = f_lsn.split('/')
+    return (int(file, 16)  << 32) + int(index, 16)
+
 def fetch_current_lsn(conn_config):
     with post_db.open_connection(conn_config, False) as conn:
         with conn.cursor() as cur:
@@ -56,8 +61,7 @@ def fetch_current_lsn(conn_config):
                 raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
             current_lsn = cur.fetchone()[0]
-            file, index = current_lsn.split('/')
-            return (int(file, 16)  << 32) + int(index, 16)
+            return lsn_to_int(current_lsn)
 
 def add_automatic_properties(stream, conn_config):
     stream['schema']['properties']['_sdc_deleted_at'] = {'type' : ['null', 'string'], 'format' :'date-time'}
