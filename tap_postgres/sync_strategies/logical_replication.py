@@ -335,6 +335,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     last_lsn_processed = None
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 600
     poll_interval = 10
+    poll_timestamp = datetime.datetime.now()
     wal_received_timestamp = datetime.datetime.now()
     wal_entries_processed = 0
 
@@ -377,6 +378,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
                         wal_entries_processed = 0
+
+                # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
+                if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+                    LOGGER.info("{} : Sending keep-alive to source server - currently waiting for wal entries".format(datetime.datetime.utcnow()))
+                    cur.send_feedback()
+                    poll_timestamp = datetime.datetime.now()
 
     if last_lsn_processed:
         for s in logical_streams:
