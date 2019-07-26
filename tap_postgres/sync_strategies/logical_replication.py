@@ -28,7 +28,7 @@ def get_pg_version(cur):
     return version
 
 def lsn_to_int(f_lsn):
-    """Convert pg_lsn format to int"""
+    """Convert pg_lsn to int"""
     file, index = f_lsn.split('/')
     return (int(file, 16)  << 32) + int(index, 16)
 
