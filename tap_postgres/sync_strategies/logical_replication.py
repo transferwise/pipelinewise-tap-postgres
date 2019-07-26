@@ -352,9 +352,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
             # Flush Postgres log up to lsn saved in state file from previous run
             LOGGER.info("Sending flush_lsn = {} to source server".format(comitted_lsn))
-            cur.send_feedback(flush_lsn=comitted_lsn, reply=True, force=True)
-            # Give source server a rest
-            time.sleep(poll_interval)
+            cur.send_feedback(flush_lsn=comitted_lsn, reply=True)
+            # Give source server a short rest
+            time.sleep(1)
 
 
             while True:
