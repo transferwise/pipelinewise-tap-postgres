@@ -381,7 +381,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
                 # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
                 if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-                    LOGGER.info("{} : Sending keep-alive to source server - waiting for wal entries".format(datetime.datetime.utcnow()))
+                    LOGGER.info("{} : Sending keep-alive to source server".format(datetime.datetime.utcnow()))
                     cur.send_feedback()
                     poll_timestamp = datetime.datetime.now()
 
