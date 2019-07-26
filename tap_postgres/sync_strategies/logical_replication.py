@@ -3,6 +3,7 @@
 
 import singer
 import datetime
+import time
 import decimal
 from singer import utils, get_bookmark
 import singer.metadata as metadata
@@ -346,7 +347,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
             # Flush Postgres log up to lsn saved in state file from previous run
             LOGGER.info("Sending flush_lsn = {} to source server".format(comitted_lsn))
-            cur.send_feedback(flush_lsn=comitted_lsn)
+            cur.send_feedback(flush_lsn=comitted_lsn, reply=True, force=True)
+            # Give source server a rest
+            time.sleep(poll_interval)
+
 
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
