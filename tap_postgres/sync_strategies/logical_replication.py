@@ -362,7 +362,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     slot = locate_replication_slot(conn_info)
     lsn_last_processed = None
     lsn_currently_processing = None
-    lsn_received_timestamp = None
+    lsn_received_timestamp = datetime.datetime.utcnow()
     lsn_processed = 0
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 600
     poll_interval = 10
@@ -386,11 +386,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
                 # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
-                if lsn_received_timestamp:
-                    poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
-                    if poll_duration > logical_poll_total_seconds:
-                        LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
-                        break
+                poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
+                if poll_duration > logical_poll_total_seconds:
+                    LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
+                    break
 
                 msg = cur.read_message()
                 if msg:
