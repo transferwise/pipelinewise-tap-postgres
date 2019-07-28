@@ -29,6 +29,10 @@ def get_pg_version(cur):
 
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
+
+    if not lsn:
+        return None
+
     file, index = lsn.split('/')
     lsni = (int(file, 16)  << 32) + int(index, 16)
     return(lsni)
@@ -36,6 +40,9 @@ def lsn_to_int(lsn):
 
 def int_to_lsn(lsni):
     """Convert int to pg_lsn"""
+
+    if not lsni:
+        return None
 
     # Convert the integer to binary
     lsnb = '{0:b}'.format(lsni)
@@ -331,7 +338,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     # This is the behaviour of the original tap-progres
     # The Pipelinewise version flushes only at the start of the next run
     # This is to ensure the data has been comitted on the destination
-    # LOGGER.info("Sending flush_lsn = {} to source server".format(msg.data_start))
+    # LOGGER.info("Sending flush_lsn = {} ({}) to source server".format(msg.data_start, int_to_lsn(msg.data_start)))
     # msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
     return state
@@ -373,7 +380,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("Sending flush_lsn = {} to source server".format(int_to_lsn(comitted_lsn)))
+            LOGGER.info("Sending flush_lsn = {} ({}) to source server".format(comitted_lsn, int_to_lsn(comitted_lsn)))
             cur.send_feedback(flush_lsn=comitted_lsn, reply=True)
 
             while True:
@@ -414,7 +421,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
     if lsn_last_processed:
         for s in logical_streams:
-            LOGGER.info("updating bookmark for stream {} to lsn={} ({})".format(s['tap_stream_id'], lsn_last_processed, int_to_lsn(lsn_last_processed)))
+            LOGGER.info("updating bookmark for stream {} to lsn = {} ({})".format(s['tap_stream_id'], lsn_last_processed, int_to_lsn(lsn_last_processed)))
             state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
