@@ -373,6 +373,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                         break
 
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
+                    if last_lsn_processed and (int(msg.data_start) >= int(last_lsn_processed)):
+                        continue
+                    else:
+                        LOGGER.info("current_lsn {} is lower than last_lsn_processed".format(msg.data_start, last_lsn_processed))
                     last_lsn_processed = msg.data_start
                     wal_entries_processed = wal_entries_processed + 1
                     if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
@@ -381,7 +385,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
                 # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
                 if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-                    LOGGER.info("{} : Sending keep-alive to source server".format(datetime.datetime.utcnow()))
+                    LOGGER.info("Sending keep-alive to source server (Last wal message {} received at {})".format(last_lsn_processed, wal_received_timestamp))
                     cur.send_feedback()
                     poll_timestamp = datetime.datetime.utcnow()
 
