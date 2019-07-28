@@ -335,8 +335,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     last_lsn_processed = None
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 600
     poll_interval = 10
-    poll_timestamp = datetime.datetime.now()
-    wal_received_timestamp = datetime.datetime.now()
+    poll_timestamp = datetime.datetime.utcnow()
+    wal_received_timestamp = datetime.datetime.utcnow()
     wal_entries_processed = 0
 
     for s in logical_streams:
@@ -360,14 +360,14 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
                 # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
-                poll_duration = (datetime.datetime.now() - wal_received_timestamp).total_seconds()
+                poll_duration = (datetime.datetime.utcnow() - wal_received_timestamp).total_seconds()
                 if poll_duration > logical_poll_total_seconds:
                     LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
                     break
 
                 msg = cur.read_message()
                 if msg:
-                    wal_received_timestamp = datetime.datetime.now()
+                    wal_received_timestamp = datetime.datetime.utcnow()
                     if msg.data_start > end_lsn:
                         LOGGER.info("Gone past end_lsn %s for run. breaking", end_lsn)
                         break
@@ -380,10 +380,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                         wal_entries_processed = 0
 
                 # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
-                if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+                if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
                     LOGGER.info("{} : Sending keep-alive to source server".format(datetime.datetime.utcnow()))
                     cur.send_feedback()
-                    poll_timestamp = datetime.datetime.now()
+                    poll_timestamp = datetime.datetime.utcnow()
 
     if last_lsn_processed:
         for s in logical_streams:
