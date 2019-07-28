@@ -31,6 +31,22 @@ def lsn_to_int(f_lsn):
     file, index = f_lsn.split('/')
     return (int(file, 16)  << 32) + int(index, 16)
 
+def int_to_lsn(lsni):
+    """Convert int to pg_lsn"""
+
+    # Convert the integer to binary
+    lsnb = '{0:b}'.format(lsni)
+
+    # file is the binary before the 32nd character, converted to hex
+    file = (format(int(lsnb[:-32], 2), 'x')).upper()
+
+    # index is the binary from the 32nd character, converted to hex
+    index = (format(int(lsnb[-32:], 2), 'x')).upper()
+
+    # Formatting
+    lsn = "{}/{}".format(file, index)
+    return(lsn)
+
 def fetch_current_lsn(conn_config):
     with post_db.open_connection(conn_config, False) as conn:
         with conn.cursor() as cur:
