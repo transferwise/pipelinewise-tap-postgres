@@ -26,10 +26,11 @@ def get_pg_version(cur):
     LOGGER.debug("Detected PostgreSQL version: %s", version)
     return version
 
-def lsn_to_int(f_lsn):
+def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
-    file, index = f_lsn.split('/')
-    return (int(file, 16)  << 32) + int(index, 16)
+    file, index = lsn.split('/')
+    lnsi = (int(file, 16)  << 32) + int(index, 16)
+    return(lsni)
 
 def int_to_lsn(lsni):
     """Convert int to pg_lsn"""
