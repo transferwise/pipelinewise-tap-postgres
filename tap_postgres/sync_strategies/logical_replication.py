@@ -26,19 +26,26 @@ def get_pg_version(cur):
     LOGGER.debug("Detected PostgreSQL version: %s", version)
     return version
 
+
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
     file, index = lsn.split('/')
     lsni = (int(file, 16)  << 32) + int(index, 16)
     return(lsni)
 
+
 def int_to_lsn(lsni):
     """Convert int to pg_lsn"""
 
     # Convert the integer to binary
     lsnb = '{0:b}'.format(lsni)
+
     # file is the binary before the 32nd character, converted to hex
-    file = (format(int(lsnb[:-32], 2), 'x')).upper()
+    if len(lsnb) > 32:
+        file = (format(int(lsnb[:-32], 2), 'x')).upper()
+    else:
+        file = '0'
+
     # index is the binary from the 32nd character, converted to hex
     index = (format(int(lsnb[-32:], 2), 'x')).upper()
     # Formatting
