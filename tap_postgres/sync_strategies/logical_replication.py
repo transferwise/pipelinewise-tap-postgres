@@ -29,7 +29,7 @@ def get_pg_version(cur):
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
     file, index = lsn.split('/')
-    lnsi = (int(file, 16)  << 32) + int(index, 16)
+    lsni = (int(file, 16)  << 32) + int(index, 16)
     return(lsni)
 
 def int_to_lsn(lsni):
