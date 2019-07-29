@@ -364,7 +364,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     lsn_currently_processing = None
     lsn_received_timestamp = datetime.datetime.utcnow()
     lsn_processed = 0
-    logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 600
+    logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
     poll_interval = 10
     poll_timestamp = datetime.datetime.utcnow()
 
@@ -394,7 +394,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 msg = cur.read_message()
                 if msg:
                     if msg.data_start > end_lsn:
-                        LOGGER.info("Gone past end_lsn %s for run. breaking", int_to_lsn(end_lsn))
+                        LOGGER.info("{} : Current {} is past end_lsn {} - breaking".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
                         break
 
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
