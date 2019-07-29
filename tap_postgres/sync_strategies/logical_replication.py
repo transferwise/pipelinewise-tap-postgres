@@ -418,6 +418,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     cur.send_feedback()
                     poll_timestamp = datetime.datetime.utcnow()
 
+            # Attempt to close connection to source
+            cur.close()
+
     if lsn_last_processed:
         for s in logical_streams:
             LOGGER.info("updating bookmark for stream {} to lsn = {} ({})".format(s['tap_stream_id'], lsn_last_processed, int_to_lsn(lsn_last_processed)))
