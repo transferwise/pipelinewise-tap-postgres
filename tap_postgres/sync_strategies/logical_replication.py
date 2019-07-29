@@ -380,7 +380,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("Sending flush_lsn = {} ({}) to source server".format(comitted_lsn, int_to_lsn(comitted_lsn)))
+            LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), comitted_lsn, int_to_lsn(comitted_lsn)))
             cur.send_feedback(flush_lsn=comitted_lsn, reply=True)
 
             while True:
