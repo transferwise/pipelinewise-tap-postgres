@@ -373,8 +373,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
-            LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. logical_poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, int_to_lsn(start_lsn), int_to_lsn(end_lsn), logical_poll_total_seconds)
             try:
+                LOGGER.info("{} : Start Replication for {} -> {} from {}".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
