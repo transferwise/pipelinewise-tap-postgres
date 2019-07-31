@@ -357,14 +357,14 @@ def locate_replication_slot(conn_info):
 
 
 def sync_tables(conn_info, logical_streams, state, end_lsn):
-    comitted_lsn = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
-    start_lsn = comitted_lsn
+    lsn_comitted = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
+    start_lsn = lsn_comitted
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     lsn_last_processed = None
     lsn_currently_processing = None
     lsn_received_timestamp = datetime.datetime.utcnow()
-    lsn_processed = 0
+    lsn_processed_count = 0
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
     poll_interval = 10
     poll_timestamp = datetime.datetime.utcnow()
@@ -381,9 +381,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), comitted_lsn, int_to_lsn(comitted_lsn)))
-            cur.send_feedback(flush_lsn=comitted_lsn, reply=True)
             time.sleep(1)
+            LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), lsn_comitted, int_to_lsn(lsn_comitted)))
+            cur.send_feedback(flush_lsn=lsn_comitted, reply=True)
 
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
@@ -409,10 +409,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                         lsn_last_processed = lsn_currently_processing
                         lsn_currently_processing = msg.data_start
                         lsn_received_timestamp = datetime.datetime.utcnow()
-                        lsn_processed = lsn_processed + 1
-                        if lsn_processed >= UPDATE_BOOKMARK_PERIOD:
+                        lsn_processed_count = lsn_processed_count + 1
+                        if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
                             singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-                            lsn_processed = 0
+                            lsn_processed_count = 0
 
                 # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
                 if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
