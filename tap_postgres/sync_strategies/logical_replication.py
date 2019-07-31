@@ -424,6 +424,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             cur.close()
 
     if lsn_last_processed:
+        if lsn_comitted > lsn_last_processed:
+            lsn_last_processed = lsn_comitted
         for s in logical_streams:
             LOGGER.info("updating bookmark for stream {} to lsn = {} ({})".format(s['tap_stream_id'], lsn_last_processed, int_to_lsn(lsn_last_processed)))
             state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
