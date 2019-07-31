@@ -3,6 +3,7 @@
 
 import singer
 import datetime
+import time
 import decimal
 from singer import utils, get_bookmark
 import singer.metadata as metadata
@@ -374,7 +375,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
             try:
-                LOGGER.info("{} : Start Replication for {} -> {} from {}".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
+                LOGGER.info("{} : Starting Replication for {} -> {} from {}".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
@@ -382,6 +383,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             # Flush Postgres log up to lsn saved in state file from previous run
             LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), comitted_lsn, int_to_lsn(comitted_lsn)))
             cur.send_feedback(flush_lsn=comitted_lsn, reply=True)
+            time.sleep(1)
 
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
