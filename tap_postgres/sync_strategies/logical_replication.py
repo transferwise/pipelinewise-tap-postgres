@@ -3,7 +3,6 @@
 
 import singer
 import datetime
-import time
 import decimal
 from singer import utils, get_bookmark
 import singer.metadata as metadata
@@ -381,7 +380,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            time.sleep(1)
             LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), lsn_comitted, int_to_lsn(lsn_comitted)))
             cur.send_feedback(flush_lsn=lsn_comitted, reply=True)
 
