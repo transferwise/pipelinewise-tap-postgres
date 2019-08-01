@@ -379,9 +379,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
-            # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), lsn_comitted, int_to_lsn(lsn_comitted)))
-            cur.send_feedback(flush_lsn=lsn_comitted, reply=True)
+            # Flush Postgres log to very first lsn 0/0
+            LOGGER.info("{} : Sending flush_lsn = 0 (0/0) to source server".format(datetime.datetime.utcnow()))
+            cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
 
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
@@ -403,6 +403,11 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     # This is to ensure we only flush to lsn that has completed entirely
                     if (lsn_currently_processing is None):
                         lsn_currently_processing = msg.data_start
+
+                        # Flush Postgres log up to lsn saved in state file from previous run
+                        LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), lsn_comitted, int_to_lsn(lsn_comitted)))
+                        cur.send_feedback(write_lsn=lsn_comitted, flush_lsn=lsn_comitted, reply=True)
+
                     elif (int(msg.data_start) > lsn_currently_processing):
                         lsn_last_processed = lsn_currently_processing
                         lsn_currently_processing = msg.data_start
