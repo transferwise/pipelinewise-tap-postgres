@@ -375,16 +375,16 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
             try:
-                LOGGER.info("{} : Starting Replication for {} -> {} from {}".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
+                LOGGER.info("{} : Starting log streaming at {} to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
             except psycopg2.ProgrammingError:
-                raise Exception("unable to start replication with logical replication slot {}".format(slot))
+                raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
 
             # Emulate some behaviour of pg_recvlogical
-            LOGGER.info("{} : confirming write up to 0/0, flush to 0/0 (slot {})".format(datetime.datetime.utcnow(), slot))
+            LOGGER.info("{} : Confirming write up to 0/0, flush to 0/0".format(datetime.datetime.utcnow()))
             cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
             time.sleep(poll_interval)
-            LOGGER.info("{} : confirming write up to {}, flush to 0/0 (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), slot))
+            LOGGER.info("{} : Confirming write up to {}, flush to 0/0".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn)))
             cur.send_feedback(write_lsn=start_lsn, flush_lsn=0, reply=True)
             time.sleep(poll_interval)
 
@@ -413,7 +413,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                         lsn_currently_processing = msg.data_start
 
                         # Flush Postgres log up to lsn saved in state file from previous run
-                        LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), lsn_comitted, int_to_lsn(lsn_comitted)))
+                        LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_comitted), int_to_lsn(lsn_comitted)))
                         cur.send_feedback(write_lsn=lsn_comitted, flush_lsn=lsn_comitted, reply=True)
 
                     elif (int(msg.data_start) > lsn_currently_processing):
