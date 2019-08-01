@@ -419,7 +419,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     poll_timestamp = datetime.datetime.utcnow()
 
             # Close replication cursor
-            cur.close()
+            try:
+                cur.close()
+            except:
+                pass
 
     if lsn_last_processed:
         if lsn_comitted > lsn_last_processed:
