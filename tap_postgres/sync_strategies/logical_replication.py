@@ -383,10 +383,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             # Emulate some behaviour of pg_recvlogical
             LOGGER.info("{} : Confirming write up to 0/0, flush to 0/0".format(datetime.datetime.utcnow()))
             cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
-            time.sleep(poll_interval)
-            LOGGER.info("{} : Confirming write up to {}, flush to 0/0".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn)))
-            cur.send_feedback(write_lsn=start_lsn, flush_lsn=0, reply=True)
-            time.sleep(poll_interval)
+            time.sleep(poll_interval*2)
 
             lsn_received_timestamp = datetime.datetime.utcnow()
             poll_timestamp = datetime.datetime.utcnow()
@@ -411,6 +408,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     # This is to ensure we only flush to lsn that has completed entirely
                     if (lsn_currently_processing is None):
                         lsn_currently_processing = msg.data_start
+                        LOGGER.info("{} : First message received {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing)))
 
                         # Flush Postgres log up to lsn saved in state file from previous run
                         LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_comitted), int_to_lsn(lsn_comitted)))
