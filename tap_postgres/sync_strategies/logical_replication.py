@@ -407,7 +407,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     # This is to ensure we only flush to lsn that has completed entirely
                     if (lsn_currently_processing is None):
                         lsn_currently_processing = msg.data_start
-                        LOGGER.info("{} : First message received {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing)))
+                        LOGGER.info("{} : First message received is {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
 
                         # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
                         lsn_to_flush = lsn_comitted
