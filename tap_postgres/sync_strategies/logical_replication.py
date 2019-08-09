@@ -420,11 +420,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                 lsn_to_flush = lsn_comitted
                 if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
                 LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
-                try:
-                    cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
-                except Exception as e:
-                    LOGGER.info("{} : {}".format(datetime.datetime.utcnow(), e))
-                    pass
+                cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
 
             elif (int(msg.data_start) > lsn_currently_processing):
                 lsn_last_processed = lsn_currently_processing
@@ -438,25 +434,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
         # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
             LOGGER.info("{} : Sending keep-alive to source server (last message received was {} at {})".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
-            try:
-                cur.send_feedback()
-            except Exception as e:
-                LOGGER.info("{} : {}".format(datetime.datetime.utcnow(), e))
-                pass
+            cur.send_feedback()
             poll_timestamp = datetime.datetime.utcnow()
 
     # Close replication connection and cursor
     cur.close()
-    try:
-        cur.close()
-    except Exception as e:
-        LOGGER.info("{} : {}".format(datetime.datetime.utcnow(), e))
-        pass
-    try:
-        conn.close()
-    except Exception as e:
-        LOGGER.info("{} : {}".format(datetime.datetime.utcnow(), e))
-        pass
+    conn.close()
 
     if lsn_last_processed:
         if lsn_comitted > lsn_last_processed:
