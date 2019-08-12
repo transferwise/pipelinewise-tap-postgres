@@ -114,11 +114,14 @@ def tuples_to_map(accum, t):
     accum[t[0]] = t[1]
     return accum
 
+def create_hstore_elem_query(elem):
+    return psycopg2.sql.SQL("SELECT hstore_to_array({})").format(psycopg2.sql.Literal(elem))
+
 def create_hstore_elem(conn_info, elem):
     with post_db.open_connection(conn_info) as conn:
         with conn.cursor() as cur:
-            sql = """SELECT hstore_to_array('{}')""".format(elem)
-            cur.execute(sql)
+            sql_stmt = create_hstore_elem_query(elem)
+            cur.execute(sql_stmt)
             res = cur.fetchone()[0]
             hstore_elem = reduce(tuples_to_map, [res[i:i + 2] for i in range(0, len(res), 2)], {})
             return hstore_elem
@@ -176,8 +179,8 @@ def create_array_elem(elem, sql_datatype, conn_info):
                 #custom datatypes like enums
                 cast_datatype = 'text[]'
 
-            sql = """SELECT $stitch_quote${}$stitch_quote$::{}""".format(elem, cast_datatype)
-            cur.execute(sql)
+            sql_stmt = """SELECT $stitch_quote${}$stitch_quote$::{}""".format(elem, cast_datatype)
+            cur.execute(sql_stmt)
             res = cur.fetchone()[0]
             return res
 
@@ -192,8 +195,8 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
     if sql_datatype == 'timestamp with time zone':
         if isinstance(elem, datetime.datetime):
             return elem.isoformat()
-        else:
-            return parse(elem).isoformat()
+
+        return parse(elem).isoformat()
     if sql_datatype == 'date':
         if  isinstance(elem, datetime.date):
             #logical replication gives us dates as strings UNLESS they from an array
@@ -223,16 +226,16 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
 def selected_array_to_singer_value(elem, sql_datatype, conn_info):
     if isinstance(elem, list):
         return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, conn_info), elem))
-    else:
-        return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
+
+    return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
 
 def selected_value_to_singer_value(elem, sql_datatype, conn_info):
     #are we dealing with an array?
     if sql_datatype.find('[]') > 0:
         cleaned_elem = create_array_elem(elem, sql_datatype, conn_info)
         return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, conn_info), (cleaned_elem or [])))
-    else:
-        return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
+
+    return selected_value_to_singer_value_impl(elem, sql_datatype, conn_info)
 
 def row_to_singer_message(stream, row, version, columns, time_extracted, md_map, conn_info):
     row_to_persist = ()
