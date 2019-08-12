@@ -120,8 +120,8 @@ def create_hstore_elem_query(elem):
 def create_hstore_elem(conn_info, elem):
     with post_db.open_connection(conn_info) as conn:
         with conn.cursor() as cur:
-            query = create_hstore_elem_query(elem)
-            cur.execute(query)
+            sql_stmt = create_hstore_elem_query(elem)
+            cur.execute(sql_stmt)
             res = cur.fetchone()[0]
             hstore_elem = reduce(tuples_to_map, [res[i:i + 2] for i in range(0, len(res), 2)], {})
             return hstore_elem
