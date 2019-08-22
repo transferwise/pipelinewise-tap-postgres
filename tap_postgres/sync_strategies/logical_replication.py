@@ -404,7 +404,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             msg = cur.read_message()
         except Exception as e:
             LOGGER.info("{} : Breaking with ERROR:{}".format(datetime.datetime.utcnow(), e))
-            break
+            raise
 
         if msg:
             if msg.data_start > end_lsn:
