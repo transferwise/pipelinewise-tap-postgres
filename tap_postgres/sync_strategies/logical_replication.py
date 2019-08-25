@@ -397,7 +397,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
         # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
         poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
         if poll_duration > logical_poll_total_seconds:
-            LOGGER.info("{} : Breaking with {} seconds of polling with no data".format(datetime.datetime.utcnow(), poll_duration))
+            LOGGER.info("{} : Breaking - {} seconds of polling with no data".format(datetime.datetime.utcnow(), poll_duration))
             break
 
         try:
@@ -408,7 +408,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
         if msg:
             if msg.data_start > end_lsn:
-                LOGGER.info("{} : Breaking with current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
+                LOGGER.info("{} : Breaking - current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
                 break
 
             state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
