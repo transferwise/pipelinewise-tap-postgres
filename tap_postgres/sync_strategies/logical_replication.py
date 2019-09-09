@@ -348,7 +348,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
 def locate_replication_slot(conn_info):
     with post_db.open_connection(conn_info, False) as conn:
         with conn.cursor() as cur:
-            db_specific_slot = "pipelinewise_{}".format(conn_info['dbname'])
+            db_specific_slot = "pipelinewise_{}".format(conn_info['dbname'].lower())
             cur.execute("SELECT * FROM pg_replication_slots WHERE slot_name = %s AND plugin = %s", (db_specific_slot, 'wal2json'))
             if len(cur.fetchall()) == 1:
                 LOGGER.info("Using pg_replication_slot %s", db_specific_slot)
