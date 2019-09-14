@@ -415,7 +415,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
             # When using wal2json with write-in-chunks, multiple messages can have the same lsn
             # This is to ensure we only flush to lsn that has completed entirely
-            if (lsn_currently_processing is None):
+            if lsn_currently_processing is None:
                 lsn_currently_processing = msg.data_start
                 LOGGER.info("{} : First message received is {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
 
@@ -436,7 +436,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
         # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-            if (lsn_currently_processing is None):
+            if lsn_currently_processing is None:
                 LOGGER.info("{} : Sending keep-alive to source server (last message received was {} at {})".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                 cur.send_feedback()
             else:
