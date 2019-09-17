@@ -356,7 +356,7 @@ def locate_replication_slot(conn_info):
                 raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn):
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_comitted = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
     start_lsn = lsn_comitted
     lsn_to_flush = None
@@ -406,9 +406,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             raise
 
         if msg:
-            # if msg.data_start > end_lsn:
-            #     LOGGER.info("{} : Breaking - current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
-            #     break
+            if msg.data_start > end_lsn:
+                LOGGER.info("{} : Breaking - current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
+                break
 
             state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
 
@@ -435,12 +435,15 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
         # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-            if lsn_currently_processing is None:
-                LOGGER.info("{} : Sending keep-alive message to source server".format(datetime.datetime.utcnow()))
+            if (lsn_currently_processing is None) or (state_file is None):
+                LOGGER.info("state_file : " + state_file)
+                LOGGER.info("lsn_currently_processing : " + lsn_currently_processing)
+                LOGGER.info("{} : Sending keep-alive message to source server (last message received was {} at {})".format(
+                    datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                 cur.send_feedback()
             else:
-                # lsn_comitted = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
-                # ^ This is bad since it gets from the object ... need to get from the state.json file
+                # Read lsn_comitted currently captured in state file on disk
+                lsn_comitted = min([get_bookmark(utils.load_json(state_file), s['tap_stream_id'], 'lsn') for s in logical_streams])
                 lsn_to_flush = lsn_comitted
                 LOGGER.info("{} : Confirming write up to {}, flush to {} (last message received was {} at {})".format(
                     datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
