@@ -19,6 +19,7 @@ import singer.schema
 from singer import utils, metadata, get_bookmark
 from singer.schema import Schema
 from singer.catalog import Catalog, CatalogEntry
+import argparse
 
 import tap_postgres.sync_strategies.logical_replication as logical_replication
 import tap_postgres.sync_strategies.full_table as full_table
@@ -580,12 +581,12 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
     return state
 
-def sync_logical_streams(conn_config, logical_streams, state, end_lsn):
+def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file):
     if logical_streams:
         LOGGER.info("Pure Logical Replication upto lsn %s for (%s)", end_lsn, list(map(lambda s: s['tap_stream_id'], logical_streams)))
         logical_streams = list(map(lambda s: logical_replication.add_automatic_properties(s, conn_config), logical_streams))
 
-        state = logical_replication.sync_tables(conn_config, logical_streams, state, end_lsn)
+        state = logical_replication.sync_tables(conn_config, logical_streams, state, end_lsn, state_file)
 
     return state
 
@@ -645,7 +646,7 @@ def any_logical_streams(streams, default_replication_method):
 
     return False
 
-def do_sync(conn_config, catalog, default_replication_method, state):
+def do_sync(conn_config, catalog, default_replication_method, state, state_file = None):
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
     streams.sort(key=lambda s: s['tap_stream_id'])
@@ -675,11 +676,74 @@ def do_sync(conn_config, catalog, default_replication_method, state):
     logical_streams.sort(key=lambda s: metadata.to_map(s['metadata']).get(()).get('database-name'))
     for dbname, streams in itertools.groupby(logical_streams, lambda s: metadata.to_map(s['metadata']).get(()).get('database-name')):
         conn_config['dbname'] = dbname
-        state = sync_logical_streams(conn_config, list(streams), state, end_lsn)
+        state = sync_logical_streams(conn_config, list(streams), state, end_lsn, state_file)
     return state
 
+def parse_args(required_config_keys):
+    # fork function to be able to grab path of state file
+    '''Parse standard command-line args.
+
+    Parses the command-line arguments mentioned in the SPEC and the
+    BEST_PRACTICES documents:
+
+    -c,--config     Config file
+    -s,--state      State file
+    -d,--discover   Run in discover mode
+    -p,--properties Properties file: DEPRECATED, please use --catalog instead
+    --catalog       Catalog file
+
+    Returns the parsed args object from argparse. For each argument that
+    point to JSON files (config, state, properties), we will automatically
+    load and parse the JSON file.
+    '''
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Config file',
+        required=True)
+
+    parser.add_argument(
+        '-s', '--state',
+        help='State file')
+
+    parser.add_argument(
+        '-p', '--properties',
+        help='Property selections: DEPRECATED, Please use --catalog instead')
+
+    parser.add_argument(
+        '--catalog',
+        help='Catalog file')
+
+    parser.add_argument(
+        '-d', '--discover',
+        action='store_true',
+        help='Do schema discovery')
+
+    args = parser.parse_args()
+    if args.config:
+        setattr(args, 'config_path', args.config)
+        args.config = utils.load_json(args.config)
+    if args.state:
+        setattr(args, 'state_path', args.state)
+        args.state_file = args.state
+        args.state = utils.load_json(args.state)
+    else:
+        args.state_file = None
+        args.state = {}
+    if args.properties:
+        setattr(args, 'properties_path', args.properties)
+        args.properties = utils.load_json(args.properties)
+    if args.catalog:
+        setattr(args, 'catalog_path', args.catalog)
+        args.catalog = Catalog.load(args.catalog)
+
+    utils.check_config(args.config, required_config_keys)
+
+    return args
+
 def main_impl():
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
+    args = parse_args(REQUIRED_CONFIG_KEYS)
     conn_config = {'host'     : args.config['host'],
                    'user'     : args.config['user'],
                    'password' : args.config['password'],
@@ -702,7 +766,8 @@ def main_impl():
         do_discovery(conn_config)
     elif args.properties or args.catalog:
         state = args.state
-        do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties, args.config.get('default_replication_method'), state)
+        state_file = args.state_file
+        do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties, args.config.get('default_replication_method'), state, state_file)
     else:
         LOGGER.info("No properties were selected")
 

@@ -335,11 +335,10 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     singer.write_message(record_message)
     state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
 
-    if msg.data_start > end_lsn:
-        raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
-
     # Below is the behaviour of the original tap-progres to flush the source server wal to the latest lsn received in the current run
     # The Pipelinewise version flushes only at the start of the next run to ensure the data has been comitted on the destination server
+    # if msg.data_start > end_lsn:
+    #     raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
     # LOGGER.info("Confirming write up to {}, flush to {}".format(int_to_lsn(msg.data_start), int_to_lsn(msg.data_start)))
     # msg.cursor.send_feedback(write_lsn=msg.data_start, flush_lsn=msg.data_start, reply=True)
 
@@ -357,7 +356,7 @@ def locate_replication_slot(conn_info):
                 raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn):
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_comitted = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
     start_lsn = lsn_comitted
     lsn_to_flush = None
@@ -415,7 +414,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
             # When using wal2json with write-in-chunks, multiple messages can have the same lsn
             # This is to ensure we only flush to lsn that has completed entirely
-            if (lsn_currently_processing is None):
+            if lsn_currently_processing is None:
                 lsn_currently_processing = msg.data_start
                 LOGGER.info("{} : First message received is {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
 
@@ -436,8 +435,21 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
 
         # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-            LOGGER.info("{} : Sending keep-alive to source server (last message received was {} at {})".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
-            cur.send_feedback()
+            if lsn_currently_processing is None:
+                LOGGER.info("{} : Sending keep-alive message to source server (last message received was {} at {})".format(
+                    datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+                cur.send_feedback()
+            elif state_file is None:
+                LOGGER.info("{} : Sending keep-alive message to source server (last message received was {} at {})".format(
+                    datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+                cur.send_feedback()
+            else:
+                # Read lsn_comitted currently captured in state file on disk
+                lsn_comitted = min([get_bookmark(utils.load_json(state_file), s['tap_stream_id'], 'lsn') for s in logical_streams])
+                lsn_to_flush = lsn_comitted
+                LOGGER.info("{} : Confirming write up to {}, flush to {} (last message received was {} at {})".format(
+                    datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+                cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
             poll_timestamp = datetime.datetime.utcnow()
 
     # Close replication connection and cursor
@@ -450,6 +462,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             LOGGER.info("Current lsn_last_processed {} is older than lsn_comitted {}".format(int_to_lsn(lsn_last_processed), int_to_lsn(lsn_comitted)))
         for s in logical_streams:
             LOGGER.info("updating bookmark for stream {} to lsn = {} ({})".format(s['tap_stream_id'], lsn_last_processed, int_to_lsn(lsn_last_processed)))
+            cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
             state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
