@@ -435,9 +435,11 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
 
         # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-            if (lsn_currently_processing is None) or (state_file is None):
-                LOGGER.info("state_file : " + state_file)
-                LOGGER.info("lsn_currently_processing : " + lsn_currently_processing)
+            if lsn_currently_processing is None:
+                LOGGER.info("{} : Sending keep-alive message to source server (last message received was {} at {})".format(
+                    datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+                cur.send_feedback()
+            elif state_file is None:
                 LOGGER.info("{} : Sending keep-alive message to source server (last message received was {} at {})".format(
                     datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                 cur.send_feedback()
