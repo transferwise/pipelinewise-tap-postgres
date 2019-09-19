@@ -370,6 +370,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     poll_interval = 10
     poll_timestamp = None
 
+    selected_tables = []
+    for s in logical_streams:
+        selected_tables.append("{}.{}".format(s['metadata'][0]['metadata']['schema-name'], s['table_name']))
+
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
 
@@ -379,7 +383,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
 
     try:
         LOGGER.info("{} : Starting log streaming at {} to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
-        cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
+        cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1, 'add-tables': ','.join(selected_tables)})
     except psycopg2.ProgrammingError:
         raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
 
