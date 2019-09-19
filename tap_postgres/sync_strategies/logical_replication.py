@@ -466,7 +466,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             LOGGER.info("Current lsn_last_processed {} is older than lsn_comitted {}".format(int_to_lsn(lsn_last_processed), int_to_lsn(lsn_comitted)))
         for s in logical_streams:
             LOGGER.info("updating bookmark for stream {} to lsn = {} ({})".format(s['tap_stream_id'], lsn_last_processed, int_to_lsn(lsn_last_processed)))
-            cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
             state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
