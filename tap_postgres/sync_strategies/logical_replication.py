@@ -451,6 +451,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                 # Read lsn_comitted currently captured in state file on disk
                 lsn_comitted = min([get_bookmark(utils.load_json(state_file), s['tap_stream_id'], 'lsn') for s in logical_streams])
                 lsn_to_flush = lsn_comitted
+                if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
                 LOGGER.info("{} : Confirming write up to {}, flush to {} (last message received was {} at {})".format(
                     datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                 cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
