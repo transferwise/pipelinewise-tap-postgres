@@ -434,10 +434,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                 lsn_received_timestamp = datetime.datetime.utcnow()
                 lsn_processed_count = lsn_processed_count + 1
                 if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
-                    LOGGER.info("Updating bookmarks for all streams to lsn = {} ({})".format(lsn_last_processed, int_to_lsn(lsn_last_processed)))
+                    # Updating bookmarks for all streams to lsn = lsn_last_processed
                     for s in logical_streams:
                         state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
-
                     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
                     lsn_processed_count = 0
 
