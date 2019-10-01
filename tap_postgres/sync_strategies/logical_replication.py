@@ -203,6 +203,8 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
             return elem.isoformat() + 'T00:00:00+00:00'
         return parse(elem).isoformat() + "+00:00"
     if sql_datatype == 'time with time zone':
+        if elem.startswith('24'):
+            elem = elem.replace('24','00',1)
         return parse(elem).isoformat().split('T')[1]
     if sql_datatype == 'bit':
         #for arrays, elem will == True
