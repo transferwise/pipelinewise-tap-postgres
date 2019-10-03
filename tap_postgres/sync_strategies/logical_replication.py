@@ -217,6 +217,7 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
         elem = elem_obj.strftime('%H:%M:%S')
         return parse(elem).isoformat().split('T')[1]
     if sql_datatype == 'time without time zone':
+        # Replace hour=24 with hour=0
         if elem.startswith('24'):
             elem = elem.replace('24','00',1)
         return parse(elem).isoformat().split('T')[1]
