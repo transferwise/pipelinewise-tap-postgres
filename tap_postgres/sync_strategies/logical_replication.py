@@ -4,6 +4,7 @@
 import singer
 import datetime
 import time
+import pytz
 import decimal
 from singer import utils, get_bookmark
 import singer.metadata as metadata
@@ -203,6 +204,22 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
             return elem.isoformat() + 'T00:00:00+00:00'
         return parse(elem).isoformat() + "+00:00"
     if sql_datatype == 'time with time zone':
+        '''time with time zone values will be converted to UTC and time zone dropped'''
+        # Replace hour=24 with hour=0
+        if elem.startswith('24'): elem = elem.replace('24','00',1)
+        # convert to UTC
+        elem = elem + '00'
+        elem_obj = datetime.datetime.strptime(elem, '%H:%M:%S%z')
+        if elem_obj.utcoffset() != datetime.timedelta(seconds=0):
+            LOGGER.warning('time with time zone values are converted to UTC'.format(og_sql_datatype))
+        elem_obj = elem_obj.astimezone(pytz.utc)
+        # drop time zone
+        elem = elem_obj.strftime('%H:%M:%S')
+        return parse(elem).isoformat().split('T')[1]
+    if sql_datatype == 'time without time zone':
+        # Replace hour=24 with hour=0
+        if elem.startswith('24'):
+            elem = elem.replace('24','00',1)
         return parse(elem).isoformat().split('T')[1]
     if sql_datatype == 'bit':
         #for arrays, elem will == True
