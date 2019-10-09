@@ -595,7 +595,9 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
         new_state = dict(currently_syncing = state['currently_syncing'], bookmarks = {})
 
         for stream, bookmark in state['bookmarks'].items():
-            if (bookmark['last_replication_method'] != 'LOG_BASED'):
+            if bookmark == {}:
+                new_state['bookmarks'][stream] = bookmark
+            elif (bookmark['last_replication_method'] != 'LOG_BASED'):
                 new_state['bookmarks'][stream] = bookmark
             elif stream in selected_streams:
                 new_state['bookmarks'][stream] = bookmark
@@ -701,8 +703,8 @@ def parse_args(required_config_keys):
     Parses the command-line arguments mentioned in the SPEC and the
     BEST_PRACTICES documents:
 
-    -c,--config     Config file
-    -s,--state      State file
+    -c,--config     config file
+    -s,--state      state file
     -d,--discover   Run in discover mode
     -p,--properties Properties file: DEPRECATED, please use --catalog instead
     --catalog       Catalog file
@@ -720,7 +722,7 @@ def parse_args(required_config_keys):
 
     parser.add_argument(
         '-s', '--state',
-        help='State file')
+        help='state file')
 
     parser.add_argument(
         '-p', '--properties',
