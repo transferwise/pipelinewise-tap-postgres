@@ -586,6 +586,21 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
         LOGGER.info("Pure Logical Replication upto lsn %s for (%s)", end_lsn, list(map(lambda s: s['tap_stream_id'], logical_streams)))
         logical_streams = list(map(lambda s: logical_replication.add_automatic_properties(s, conn_config), logical_streams))
 
+        # Remove LOG_BASED stream bookmarks from state if it has been de-selected
+        # This is to avoid sending very old starting and flushing positions to source
+        selected_streams = set()
+        for s in logical_streams:
+            selected_streams.add("{}".format(s['tap_stream_id']))
+
+        new_state = dict(currently_syncing = state['currently_syncing'], bookmarks = {})
+
+        for stream, bookmark in state['bookmarks'].items():
+            if (bookmark['last_replication_method'] != 'LOG_BASED'):
+                new_state['bookmarks'][stream] = bookmark
+            elif stream in selected_streams:
+                new_state['bookmarks'][stream] = bookmark
+        state = new_state
+
         state = logical_replication.sync_tables(conn_config, logical_streams, state, end_lsn, state_file)
 
     return state
