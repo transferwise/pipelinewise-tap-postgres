@@ -132,8 +132,8 @@ def hstore_available(conn_info):
             return False
 
 
-def compute_tap_stream_id(database_name, schema_name, table_name):
-    return database_name + '-' + schema_name + '-' + table_name
+def compute_tap_stream_id(schema_name, table_name):
+    return schema_name + '-' + table_name
 
 
 #NB> numeric/decimal columns in postgres without a specified scale && precision

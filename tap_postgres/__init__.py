@@ -381,7 +381,7 @@ def discover_columns(connection, table_info):
             entry = {'table_name'    : table_name,
                      'stream'        : table_name,
                      'metadata'      : metadata.to_list(mdata),
-                     'tap_stream_id' : post_db.compute_tap_stream_id(database_name, schema_name, table_name),
+                     'tap_stream_id' : post_db.compute_tap_stream_id(schema_name, table_name),
                      'schema'        : schema}
 
             entries.append(entry)
@@ -413,7 +413,7 @@ def do_discovery(conn_config):
     all_streams = []
 
     with post_db.open_connection(conn_config) as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
             cur.itersize = post_db.cursor_iter_size
             sql = """SELECT datname
             FROM pg_database
