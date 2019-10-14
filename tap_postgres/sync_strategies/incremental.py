@@ -10,7 +10,7 @@ import tap_postgres.db as post_db
 
 LOGGER = singer.get_logger()
 
-UPDATE_BOOKMARK_PERIOD = 1000
+UPDATE_BOOKMARK_PERIOD = 10000
 
 def fetch_max_replication_key(conn_config, replication_key, schema_name, table_name):
     with post_db.open_connection(conn_config, False) as conn:
@@ -70,7 +70,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
             else:
                 LOGGER.info("hstore is UNavailable")
 
-            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
+            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
                 cur.itersize = post_db.cursor_iter_size
                 LOGGER.info("Beginning new incremental replication sync %s", stream_version)
                 if replication_key_value:
@@ -96,6 +96,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
                 for rec in cur:
                     record_message = post_db.selected_row_to_singer_message(stream, rec, stream_version, desired_columns, time_extracted, md_map)
+
                     singer.write_message(record_message)
                     rows_saved = rows_saved + 1
 

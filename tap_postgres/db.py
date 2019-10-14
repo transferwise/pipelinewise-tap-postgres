@@ -1,4 +1,6 @@
 import datetime
+import pytz
+from dateutil.parser import parse
 import decimal
 import math
 import psycopg2
@@ -52,6 +54,25 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):
         cleaned_elem = elem
     elif sql_datatype == 'money':
         cleaned_elem = elem
+    elif sql_datatype == 'time with time zone':
+        '''time with time zone values will be converted to UTC and time zone dropped'''
+        # Replace hour=24 with hour=0
+        elem = str(elem)
+        if elem.startswith('24'): elem = elem.replace('24','00',1)
+        # convert to UTC
+        elem = datetime.datetime.strptime(elem, '%H:%M:%S%z')
+        if elem.utcoffset() != datetime.timedelta(seconds=0):
+            LOGGER.warning('time with time zone values are converted to UTC')
+        elem = elem.astimezone(pytz.utc)
+        # drop time zone
+        elem = str(elem.strftime('%H:%M:%S'))
+        cleaned_elem = parse(elem).isoformat().split('T')[1]
+    elif sql_datatype == 'time without time zone':
+        # Replace hour=24 with hour=0
+        elem = str(elem)
+        if elem.startswith('24'):
+            elem = elem.replace('24','00',1)
+        cleaned_elem = parse(elem).isoformat().split('T')[1]
     elif isinstance(elem, datetime.datetime):
         if sql_datatype == 'timestamp with time zone':
             cleaned_elem = elem.isoformat()
@@ -132,8 +153,8 @@ def hstore_available(conn_info):
             return False
 
 
-def compute_tap_stream_id(database_name, schema_name, table_name):
-    return database_name + '-' + schema_name + '-' + table_name
+def compute_tap_stream_id(schema_name, table_name):
+    return schema_name + '-' + table_name
 
 
 #NB> numeric/decimal columns in postgres without a specified scale && precision
