@@ -374,7 +374,8 @@ def locate_replication_slot(conn_info):
 
 
 def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
-    lsn_comitted = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
+    state_comitted = state
+    lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
     start_lsn = lsn_comitted
     lsn_to_flush = None
     time_extracted = utils.now()
@@ -451,7 +452,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                 lsn_received_timestamp = datetime.datetime.utcnow()
                 lsn_processed_count = lsn_processed_count + 1
                 if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
-                    LOGGER.info("{} : Updating bookmarks for all streams to lsn = {} ({})".format(datetime.datetime.utcnow(), lsn_last_processed, int_to_lsn(lsn_last_processed)))
+                    # LOGGER.info("{} : Updating bookmarks for all streams to lsn = {} ({})".format(datetime.datetime.utcnow(), lsn_last_processed, int_to_lsn(lsn_last_processed)))
                     for s in logical_streams:
                         state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
                     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
@@ -468,13 +469,21 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                 cur.send_feedback()
             else:
-                # Read lsn_comitted currently captured in state file on disk
-                lsn_comitted = min([get_bookmark(utils.load_json(state_file), s['tap_stream_id'], 'lsn') for s in logical_streams])
-                lsn_to_flush = lsn_comitted
-                if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
-                LOGGER.info("{} : Confirming write up to {}, flush to {} (last message received was {} at {})".format(
-                    datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
-                cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
+                # Read lsn_comitted from state.json and feeback to source server
+                try:
+                    state_comitted_file = open(state_file)
+                except:
+                    LOGGER.warning("{} : Unable to open {}".format(datetime.datetime.utcnow(), state_file))
+                else:
+                    state_comitted = json.load(state_comitted_file)
+                finally:
+                    lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
+                    lsn_to_flush = lsn_comitted
+                    if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
+                    LOGGER.info("{} : Confirming write up to {}, flush to {} (last message received was {} at {})".format(
+                        datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+                    cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
+
             poll_timestamp = datetime.datetime.utcnow()
 
     # Close replication connection and cursor
