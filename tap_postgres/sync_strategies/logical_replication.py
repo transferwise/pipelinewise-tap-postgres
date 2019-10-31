@@ -400,8 +400,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     cur = conn.cursor()
 
     try:
-        LOGGER.info("{} : Starting log streaming from 0/0 to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(end_lsn), slot))
-        cur.start_replication(slot_name=slot, decode=True, start_lsn=0, status_interval=poll_interval, options={'write-in-chunks': 1, 'add-tables': ','.join(selected_tables)})
+        LOGGER.info("{} : Request wal streaming from {} to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
+        cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, status_interval=poll_interval, options={'write-in-chunks': 1, 'add-tables': ','.join(selected_tables)})
     except psycopg2.ProgrammingError:
         raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
 
@@ -437,7 +437,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             # This is to ensure we only flush to lsn that has completed entirely
             if lsn_currently_processing is None:
                 lsn_currently_processing = msg.data_start
-                LOGGER.info("{} : First message received is {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
+                LOGGER.info("{} : First wal message received was {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
 
                 # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
                 lsn_to_flush = lsn_comitted
@@ -463,7 +463,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             if lsn_currently_processing is None:
                 LOGGER.info("{} : Waiting for first message".format(datetime.datetime.utcnow()))
             else:
-                LOGGER.info("{} : Last message received was {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+                LOGGER.info("{} : Last wal message received was {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                 try:
                     state_comitted_file = open(state_file)
                 except:
