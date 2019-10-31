@@ -401,6 +401,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
 
     try:
         LOGGER.info("{} : Request wal streaming from {} to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
+        # psycopg2 2.8.4 will send a keep-alive message to postgres every status_interval
         cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, status_interval=poll_interval, options={'write-in-chunks': 1, 'add-tables': ','.join(selected_tables)})
     except psycopg2.ProgrammingError:
         raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
@@ -458,7 +459,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     lsn_processed_count = 0
 
         # Every poll_interval, update latest comitted lsn position from the state_file
-        # psycopg2 2.8.4 will send a keep-alive message with latest confirmed_flush_lsn
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
             if lsn_currently_processing is None:
                 LOGGER.info("{} : Waiting for first message".format(datetime.datetime.utcnow()))
