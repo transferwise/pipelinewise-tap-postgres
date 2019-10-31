@@ -461,7 +461,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
         # Every poll_interval, update latest comitted lsn position from the state_file
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
             if lsn_currently_processing is None:
-                LOGGER.info("{} : Waiting for first message".format(datetime.datetime.utcnow()))
+                LOGGER.info("{} : Waiting for first wal message".format(datetime.datetime.utcnow()))
             else:
                 LOGGER.info("{} : Last wal message received was {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                 try:
