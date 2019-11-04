@@ -6,7 +6,7 @@ with open('README.md') as f:
       long_description = f.read()
 
 setup(name='pipelinewise-tap-postgres',
-      version='1.1.9',
+      version='1.2.0',
       description='Singer.io tap for extracting data from PostgreSQL - PipelineWise compatible',
       long_description=long_description,
       long_description_content_type='text/markdown',
@@ -18,7 +18,7 @@ setup(name='pipelinewise-tap-postgres',
       ],
       install_requires=[
           'singer-python==5.8.1',
-          'psycopg2==2.8.2',
+          'psycopg2==2.8.4',
           'strict-rfc3339==0.7',
           'nose==1.3.7'
       ],
