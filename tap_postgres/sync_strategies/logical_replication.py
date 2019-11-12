@@ -428,7 +428,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             raise
 
         if msg:
-            if msg.data_start > end_lsn:
+            if (break_at_current_lsn) and (msg.data_start > end_lsn):
                 LOGGER.info("{} : Breaking - current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
                 break
 
@@ -471,10 +471,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     LOGGER.warning("{} : Unable to open and parse {}".format(datetime.datetime.utcnow(), state_file))
                 finally:
                     lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
-                    lsn_to_flush = lsn_comitted
-                    if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
-                    LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
-                    cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
+                    if (lsn_currently_processing > lsn_comitted) and (lsn_comitted > lsn_to_flush):
+                        lsn_to_flush = lsn_comitted
+                        LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
+                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
 
             poll_timestamp = datetime.datetime.utcnow()
 
