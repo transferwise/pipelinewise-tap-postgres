@@ -385,6 +385,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_currently_processing = None
     lsn_received_timestamp = None
     lsn_processed_count = 0
+    break_at_current_lsn = conn_info['break_at_current_lsn']
+    maximum_run_seconds = conn_info['maximum_run_seconds']
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
     poll_interval = 10
     poll_timestamp = None
@@ -473,7 +475,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     state_comitted_file = open(state_file)
                     state_comitted = json.load(state_comitted_file)
                 except:
-                    LOGGER.warning("{} : Unable to open and parse {}".format(datetime.datetime.utcnow(), state_file))
+                    LOGGER.info("{} : Unable to open and parse {}".format(datetime.datetime.utcnow(), state_file))
                 finally:
                     lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
                     if (lsn_currently_processing > lsn_comitted) and (lsn_comitted > lsn_to_flush):
