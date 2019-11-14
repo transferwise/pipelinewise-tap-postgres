@@ -432,7 +432,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
 
         if msg:
             if (break_at_current_lsn) and (msg.data_start > end_lsn):
-                LOGGER.info("{} : Breaking - current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
+                LOGGER.info("{} : Breaking - latest wal message {} is past current_lsn captured at run start {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
                 break
 
             if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
