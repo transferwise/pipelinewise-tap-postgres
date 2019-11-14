@@ -384,9 +384,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_currently_processing = None
     lsn_received_timestamp = None
     lsn_processed_count = 0
-    break_at_current_lsn = conn_info['break_at_current_lsn']
     start_run_timestamp = datetime.datetime.utcnow()
     max_run_seconds = conn_info['max_run_seconds']
+    break_at_current_lsn = conn_info['break_at_current_lsn']
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
     poll_interval = 10
     poll_timestamp = None
