@@ -445,13 +445,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             # This is to ensure we only flush to lsn that has completed entirely
             if lsn_currently_processing is None:
                 lsn_currently_processing = msg.data_start
-                LOGGER.info("{} : First wal message received was {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
+                LOGGER.info("{} : First wal message received is {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing)))
 
                 # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
                 lsn_to_flush = lsn_comitted
                 if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
                 LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
-                cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
+                cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
 
             elif (int(msg.data_start) > lsn_currently_processing):
                 lsn_last_processed = lsn_currently_processing
@@ -470,7 +470,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             if lsn_currently_processing is None:
                 LOGGER.info("{} : Waiting for first wal message".format(datetime.datetime.utcnow()))
             else:
-                LOGGER.info("{} : Last wal message received was {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+                LOGGER.info("{} : Lastest wal message received is {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed)))
                 try:
                     state_comitted_file = open(state_file)
                     state_comitted = json.load(state_comitted_file)
@@ -481,7 +481,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     if (lsn_currently_processing > lsn_comitted) and (lsn_comitted > lsn_to_flush):
                         lsn_to_flush = lsn_comitted
                         LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
-                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
+                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
 
             poll_timestamp = datetime.datetime.utcnow()
 
