@@ -352,13 +352,6 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     singer.write_message(record_message)
     state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
 
-    # Below is the behaviour of the original tap-progres to flush the source server wal to the latest lsn received in the current run
-    # The Pipelinewise version flushes only at the start of the next run to ensure the data has been comitted on the destination server
-    # if msg.data_start > end_lsn:
-    #     raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
-    # LOGGER.info("Confirming write up to {}, flush to {}".format(int_to_lsn(msg.data_start), int_to_lsn(msg.data_start)))
-    # msg.cursor.send_feedback(write_lsn=msg.data_start, flush_lsn=msg.data_start, reply=True)
-
     return state
 
 def locate_replication_slot(conn_info):
