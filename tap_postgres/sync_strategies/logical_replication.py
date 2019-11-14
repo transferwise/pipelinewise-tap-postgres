@@ -386,7 +386,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_processed_count = 0
     start_run_timestamp = datetime.datetime.utcnow()
     max_run_seconds = conn_info['max_run_seconds']
-    break_at_current_lsn = conn_info['break_at_current_lsn']
+    break_at_end_lsn = conn_info['break_at_end_lsn']
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
     poll_interval = 10
     poll_timestamp = None
@@ -431,7 +431,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             raise
 
         if msg:
-            if (break_at_current_lsn) and (msg.data_start > end_lsn):
+            if (break_at_end_lsn) and (msg.data_start > end_lsn):
                 LOGGER.info("{} : Breaking - latest wal message {} is past current_lsn captured at run start {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
                 break
 
