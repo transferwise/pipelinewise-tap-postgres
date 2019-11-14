@@ -378,13 +378,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
     start_lsn = lsn_comitted
     lsn_to_flush = None
-    start_run_timestamp = datetime.datetime.utcnow()
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     lsn_last_processed = None
     lsn_currently_processing = None
     lsn_received_timestamp = None
     lsn_processed_count = 0
+    start_run_timestamp = datetime.datetime.utcnow()
     break_at_current_lsn = conn_info['break_at_current_lsn']
     max_run_seconds = conn_info['max_run_seconds']
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
