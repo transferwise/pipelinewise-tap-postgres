@@ -378,7 +378,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
     start_lsn = lsn_comitted
     lsn_to_flush = None
-    start_timestamp = datetime.datetime.utcnow()
+    start_run_timestamp = datetime.datetime.utcnow()
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     lsn_last_processed = None
@@ -435,7 +435,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                 LOGGER.info("{} : Breaking - current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
                 break
 
-            if datetime.datetime.utcnow() >= (start_timestamp + datetime.timedelta(seconds=max_run_seconds)):
+            if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
                 LOGGER.info("{} : Breaking - reached max_run_seconds of {}".format(datetime.datetime.utcnow(), max_run_seconds))
                 break
 
