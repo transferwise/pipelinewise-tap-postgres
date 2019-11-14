@@ -409,10 +409,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     except psycopg2.ProgrammingError:
         raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
 
-    # Emulate some behaviour of pg_recvlogical
-    LOGGER.info("{} : Confirming write up to 0/0, flush to 0/0".format(datetime.datetime.utcnow()))
-    cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
-
     lsn_received_timestamp = datetime.datetime.utcnow()
     poll_timestamp = datetime.datetime.utcnow()
 
