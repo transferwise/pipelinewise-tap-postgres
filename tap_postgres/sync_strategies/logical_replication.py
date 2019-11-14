@@ -466,7 +466,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             if lsn_currently_processing is None:
                 LOGGER.info("{} : Waiting for first wal message".format(datetime.datetime.utcnow()))
             else:
-                LOGGER.info("{} : Lastest wal message received is {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed)))
+                LOGGER.info("{} : Lastest wal message received was {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed)))
                 try:
                     state_comitted_file = open(state_file)
                     state_comitted = json.load(state_comitted_file)
