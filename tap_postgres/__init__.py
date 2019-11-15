@@ -769,6 +769,8 @@ def main_impl():
                    'filter_dbs' : args.config.get('filter_dbs'),
                    'filter_schemas' : args.config.get('filter_schemas'),
                    'debug_lsn' : args.config.get('debug_lsn') == 'true',
+                   'max_run_seconds' : args.config.get('max_run_seconds', 43200),
+                   'break_at_end_lsn' : args.config.get('break_at_end_lsn', True),
                    'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))
                    }
 
