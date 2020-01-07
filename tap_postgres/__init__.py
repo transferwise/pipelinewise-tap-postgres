@@ -56,6 +56,11 @@ FLOAT_TYPES = {'real', 'double precision'}
 JSON_TYPES = {'json', 'jsonb'}
 
 
+def nullable_columns(col_types, pk):
+    if pk:
+        return col_types
+    return ['null'] + col_types
+
 def nullable_column(col_type, pk):
     if pk:
         return  [col_type]
@@ -101,7 +106,7 @@ def schema_for_column_datatype(c):
         return schema
 
     if data_type in JSON_TYPES:
-        schema['type'] = nullable_column('object', c.is_primary_key)
+        schema['type'] = nullable_columns(['object', 'array'], c.is_primary_key)
         return schema
 
     if data_type == 'numeric':
