@@ -3,22 +3,19 @@
 
 import singer
 import datetime
-import time
 import pytz
 import decimal
-from singer import utils, get_bookmark
+import psycopg2
+import copy
+import json
 import singer.metadata as metadata
 import tap_postgres.db as post_db
 import tap_postgres.sync_strategies.common as sync_common
+from singer import utils, get_bookmark
 from dateutil.parser import parse
-import psycopg2
-import copy
-from select import select
 from functools import reduce
-import json
-import re
 
-LOGGER = singer.get_logger()
+LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
 
