@@ -26,9 +26,11 @@ import tap_postgres.sync_strategies.full_table as full_table
 import tap_postgres.sync_strategies.incremental as incremental
 import tap_postgres.db as post_db
 import tap_postgres.sync_strategies.common as sync_common
-LOGGER = singer.get_logger()
 
-#LogMiner do not support LONG, LONG RAW, CLOB, BLOB, NCLOB, ADT, or COLLECTION datatypes.
+
+LOGGER = singer.get_logger('tap_postgres')
+
+# LogMiner do not support LONG, LONG RAW, CLOB, BLOB, NCLOB, ADT, or COLLECTION datatypes.
 Column = collections.namedtuple('Column', [
     "column_name",
     "is_primary_key",

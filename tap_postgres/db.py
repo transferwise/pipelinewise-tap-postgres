@@ -8,7 +8,8 @@ import math
 import psycopg2
 import psycopg2.extras
 import singer
-LOGGER = singer.get_logger()
+
+LOGGER = singer.get_logger('tap_postgres')
 
 cursor_iter_size = 20000
 

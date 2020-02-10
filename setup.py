@@ -3,7 +3,7 @@
 from setuptools import setup
 
 with open('README.md') as f:
-      long_description = f.read()
+    long_description = f.read()
 
 setup(name='pipelinewise-tap-postgres',
       version='1.3.1',
@@ -17,11 +17,16 @@ setup(name='pipelinewise-tap-postgres',
           'Programming Language :: Python :: 3 :: Only'
       ],
       install_requires=[
-          'singer-python==5.8.1',
+          'pipelinewise-singer-python==1.*',
           'psycopg2==2.8.4',
           'strict-rfc3339==0.7',
-          'nose==1.3.7'
       ],
+      extras_require={
+          "test": [
+              'nose==1.3.7',
+              'pylint==2.4.2'
+          ]
+      },
       entry_points='''
           [console_scripts]
           tap-postgres=tap_postgres:main
