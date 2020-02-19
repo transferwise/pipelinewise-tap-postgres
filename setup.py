@@ -6,11 +6,11 @@ with open('README.md') as f:
     long_description = f.read()
 
 setup(name='pipelinewise-tap-postgres',
-      version='1.3.1',
-      description='Singer.io tap for extracting data from PostgreSQL - PipelineWise compatible',
+      version='1.4.0',
+      description='Singer.io tap for extracting data from PostgresSQL - PipelineWise compatible',
       long_description=long_description,
       long_description_content_type='text/markdown',
-      author='Stitch',
+      author='TransferWise',
       url='https://github.com/transferwise/pipelinewise-tap-postgres',
       classifiers=[
           'License :: OSI Approved :: GNU Affero General Public License v3',
