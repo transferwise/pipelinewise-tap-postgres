@@ -392,6 +392,24 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     conn = post_db.open_connection(conn_info, True)
     cur = conn.cursor()
 
+    # Set session wal_sender_timeout for PG12 and above
+    version = get_pg_version(cur)
+    if (version >= 120000):
+        wal_sender_timeout = 10800 #3 hours
+
+        # Detect if the source is amazon-rds and convert to milliseconds
+        cur.execute("SELECT count(*) FROM pg_settings where name ilike '%rds%'")
+        is_rds = cur.fetchone()[0]
+
+        if is_rds == 0:
+            wal_sender_timeout = wal_sender_timeout
+            LOGGER.info("Set session wal_sender_timeout = {} seconds".format(wal_sender_timeout))
+        else:
+            wal_sender_timeout = wal_sender_timeout * 1000
+            LOGGER.info("Set session wal_sender_timeout = {} milliseconds".format(wal_sender_timeout))
+
+        cur.execute("SET SESSION wal_sender_timeout = {}".format(wal_sender_timeout))
+
     try:
         LOGGER.info("Request wal streaming from {} to {} (slot {})".format(int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
         # psycopg2 2.8.4 will send a keep-alive message to postgres every status_interval
