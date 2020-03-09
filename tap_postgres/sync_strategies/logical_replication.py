@@ -403,10 +403,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
 
         if is_rds == 0:
             wal_sender_timeout = wal_sender_timeout
-            LOGGER.info("Source PostgreSQL version is {} - setting session wal_sender_timeout = {} seconds".format(version, wal_sender_timeout))
+            LOGGER.info("Set session wal_sender_timeout = {} seconds".format(wal_sender_timeout))
         else:
             wal_sender_timeout = wal_sender_timeout * 1000
-            LOGGER.info("Source PostgreSQL version is {} - setting session wal_sender_timeout = {} milliseconds".format(version, wal_sender_timeout))
+            LOGGER.info("Set session wal_sender_timeout = {} milliseconds".format(wal_sender_timeout))
 
         cur.execute("SET SESSION wal_sender_timeout = {}".format(wal_sender_timeout))
 
