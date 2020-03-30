@@ -470,7 +470,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     state_comitted_file = open(state_file)
                     state_comitted = json.load(state_comitted_file)
                 except:
-                    LOGGER.info("Unable to open and parse {}".format(state_file))
+                    LOGGER.debug("Unable to open and parse {}".format(state_file))
                 finally:
                     lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
                     if (lsn_currently_processing > lsn_comitted) and (lsn_comitted > lsn_to_flush):
