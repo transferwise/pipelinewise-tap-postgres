@@ -4,15 +4,19 @@ import singer
 from singer import  metadata
 import tap_postgres.db as post_db
 
+
+# pylint: disable=invalid-name,missing-function-docstring
 def should_sync_column(md_map, field_name):
     field_metadata = md_map.get(('properties', field_name), {})
     return singer.should_sync_field(field_metadata.get('inclusion'),
                                     field_metadata.get('selected'),
                                     True)
 
+
 def write_schema_message(schema_message):
     sys.stdout.write(json.dumps(schema_message, use_decimal=True) + '\n')
     sys.stdout.flush()
+
 
 def send_schema_message(stream, bookmark_properties):
     s_md = metadata.to_map(stream['metadata'])
