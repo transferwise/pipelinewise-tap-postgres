@@ -39,7 +39,7 @@ jobs:
           name: 'Pylinting'
           command: |
             . ./virtualenvs/tap-postgres/bin/activate
-            pylint --rcfile .pylintrc tap_postgres/
+            pylint --rcfile .pylintrc --disable duplicate-code tap_postgres/
 
       - run:
           name: 'Tests'
