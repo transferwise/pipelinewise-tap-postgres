@@ -1,22 +1,55 @@
 version: 2
+
+references:
+  container_config: &container_config
+    docker:
+      # Main Python container
+      - image: circleci/python:3.6.2
+        environment:
+          TAP_POSTGRES_PORT: 5432
+          TAP_POSTGRES_USER: test_user
+          TAP_POSTGRES_PASSWORD: my-secret-passwd
+          TAP_POSTGRES_HOST: test_postgres
+
+      # PostgreSQL service container image used as test source database
+      - image: postgres:11.4
+        name: test_postgres
+        environment:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: my-secret-passwd
+          POSTGRES_DB: tap_postgres_test
+        ports:
+          - 3306:3306
+
 jobs:
   build:
-    docker:
-      - image: circleci/python:3.4.8-jessie-browsers
+    <<: *container_config
+
     steps:
       - checkout
       - run:
-          name: 'Setup virtual env'
+          name: 'Setup virtual environment'
           command: |
-            python3 -m venv venv
-            . venv/bin/activate
-            pip install .
-            pip install pylint
-            make test
-            pylint tap_postgres -d missing-docstring,invalid-name,line-too-long,too-many-locals,too-few-public-methods,fixme,stop-iteration-return,duplicate-code,useless-import-alias
-  test:
-    docker:
-      - image: circleci/python:3.4.8-jessie-browsers
-    steps:
-      - checkout
-      - run: 'echo "Hello"'
+            python3 -m venv ./virtualenvs/tap-postgres
+            . ./virtualenvs/tap-postgres/bin/activate
+            pip install --upgrade pip
+            pip install -e .[test]
+
+      - run:
+          name: 'Pylinting'
+          command: |
+            . ./virtualenvs/tap-postgres/bin/activate
+            pylint --rcfile .pylintrc tap_postgres/
+
+      - run:
+          name: 'Tests'
+          command: |
+            . ./virtualenvs/tap-mysql/bin/activate
+            export LOGGING_CONF_FILE=./sample_logging.conf
+            nosetests -c .noserc tests
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build

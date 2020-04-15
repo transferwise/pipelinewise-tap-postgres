@@ -1,0 +1,15 @@
+[nosetests]
+# enable coverage
+with-coverage=1
+
+# cover only the main package tap_mysql
+cover-package=tap_mysql
+
+# set coverage minimum to 85, it's the current value
+cover-min-percentage=85
+
+# product html coverage report
+cover-html=1
+
+# folder where to produce the html coverage report
+cover-html-dir=coverage_report
