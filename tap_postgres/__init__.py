@@ -1,23 +1,13 @@
-#!/usr/bin/env python3
-# pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,invalid-name,too-many-return-statements,too-many-branches,len-as-condition,too-many-statements,broad-except,unnecessary-lambda
-
-import datetime
-import pdb
 import json
-import os
 import sys
-import time
 import collections
 import itertools
-from itertools import dropwhile
 import copy
-import ssl
 import psycopg2
 import psycopg2.extras
 import singer
 import singer.schema
 from singer import utils, metadata, get_bookmark
-from singer.schema import Schema
 from singer.catalog import Catalog, CatalogEntry
 import argparse
 
@@ -58,19 +48,23 @@ FLOAT_TYPES = {'real', 'double precision'}
 JSON_TYPES = {'json', 'jsonb'}
 
 
+# pylint: disable=invalid-name,missing-function-docstring
 def nullable_columns(col_types, pk):
     if pk:
         return col_types
     return ['null'] + col_types
+
 
 def nullable_column(col_type, pk):
     if pk:
         return  [col_type]
     return ['null', col_type]
 
+
+# pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
 def schema_for_column_datatype(c):
     schema = {}
-    #remove any array notation from type information as we use a separate field for that
+    # remove any array notation from type information as we use a separate field for that
     data_type = c.sql_data_type.lower().replace('[]', '')
 
     if data_type in INTEGER_TYPES:
@@ -166,10 +160,11 @@ def schema_name_for_numeric_array(precision, scale):
     schema_name = 'sdc_recursive_decimal_{}_{}_array'.format(precision, scale)
     return schema_name
 
+
 def schema_for_column(c):
-    #NB> from the post postgres docs: The current implementation does not enforce the declared number of dimensions either.
-    #these means we can say nothing about an array column. its items may be more arrays or primitive types like integers
-    #and this can vary on a row by row basis
+    # NB> from the post postgres docs: The current implementation does not enforce the declared number of dimensions
+    # either. These means we can say nothing about an array column. its items may be more arrays or primitive types
+    # like integers and this can vary on a row by row basis
 
     column_schema = {'type':["null", "array"]}
     if not c.is_array:
@@ -230,13 +225,13 @@ def schema_for_column(c):
     return column_schema
 
 
-
-#typlen  -1  == variable length arrays
-#typelem != 0 points to subtypes. 23 in the case of arrays
+# typlen  -1  == variable length arrays
+# typelem != 0 points to subtypes. 23 in the case of arrays
 # so integer arrays are typlen = -1, typelem = 23 because integer types are oid 23
 
-#this seems to identify all arrays:
-#select typname from pg_attribute  as pga join pg_type as pgt on pgt.oid = pga.atttypid  where typlen = -1 and typelem != 0 and pga.attndims > 0;
+# this seems to identify all arrays:
+# select typname from pg_attribute  as pga join pg_type as pgt on pgt.oid = pga.atttypid
+# where typlen = -1 and typelem != 0 and pga.attndims > 0;
 def produce_table_info(conn, filter_schemas=None):
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
         cur.itersize = post_db.cursor_iter_size
@@ -304,32 +299,35 @@ AND has_table_privilege(pg_class.oid, 'SELECT') = true """
 
         return table_info
 
+
 def get_database_name(connection):
     cur = connection.cursor()
 
     rows = cur.execute("SELECT name FROM v$database").fetchall()
     return rows[0][0]
 
+
 def write_sql_data_type_md(mdata, col_info):
     c_name = col_info.column_name
     if col_info.sql_data_type == 'bit' and col_info.character_maximum_length > 1:
-        mdata = metadata.write(mdata, ('properties', c_name), 'sql-datatype', "bit({})".format(col_info.character_maximum_length))
+        mdata = metadata.write(mdata, ('properties', c_name),
+                               'sql-datatype', "bit({})".format(col_info.character_maximum_length))
     else:
         mdata = metadata.write(mdata, ('properties', c_name), 'sql-datatype', col_info.sql_data_type)
 
     return mdata
 
-
-BASE_RECURSIVE_SCHEMAS = {'sdc_recursive_integer_array'   : {'type' : ['null', 'integer', 'array'], 'items' : {'$ref': '#/definitions/sdc_recursive_integer_array'}},
+#pylint: disable=line-too-long
+BASE_RECURSIVE_SCHEMAS = {'sdc_recursive_integer_array'   : {'type' : ['null', 'integer', 'array'], 'items': {'$ref': '#/definitions/sdc_recursive_integer_array'}},
                           'sdc_recursive_number_array'    : {'type' : ['null', 'number', 'array'], 'items'  : {'$ref': '#/definitions/sdc_recursive_number_array'}},
                           'sdc_recursive_string_array'    : {'type' : ['null', 'string', 'array'], 'items'  : {'$ref': '#/definitions/sdc_recursive_string_array'}},
                           'sdc_recursive_boolean_array'   : {'type' : ['null', 'boolean', 'array'], 'items' : {'$ref': '#/definitions/sdc_recursive_boolean_array'}},
                           'sdc_recursive_timestamp_array' : {'type' : ['null', 'string', 'array'], 'format' : 'date-time', 'items' : {'$ref': '#/definitions/sdc_recursive_timestamp_array'}},
                           'sdc_recursive_object_array'    : {'type' : ['null', 'object', 'array'], 'items' : {'$ref': '#/definitions/sdc_recursive_object_array'}}}
 
+
 def include_array_schemas(columns, schema):
     schema['definitions'] = copy.deepcopy(BASE_RECURSIVE_SCHEMAS)
-
 
     decimal_array_columns = [key for key, value in columns.items() if value.sql_data_type == 'numeric[]']
     for c in decimal_array_columns:
@@ -345,6 +343,7 @@ def include_array_schemas(columns, schema):
                                               'items' : {'$ref': '#/definitions/{}'.format(schema_name)}}
 
     return schema
+
 
 def discover_columns(connection, table_info):
     entries = []
@@ -395,10 +394,12 @@ def discover_columns(connection, table_info):
 
     return entries
 
+
 def discover_db(connection, filter_schemas=None):
     table_info = produce_table_info(connection, filter_schemas)
     db_streams = discover_columns(connection, table_info)
     return db_streams
+
 
 def attempt_connection_to_db(conn_config, dbname):
     nascent_config = copy.deepcopy(conn_config)
@@ -413,8 +414,10 @@ def attempt_connection_to_db(conn_config, dbname):
         LOGGER.warning('Unable to connect to %s. This maybe harmless if you have not desire to replicate from this database: "%s"', dbname, err)
         return False
 
+
 def dump_catalog(all_streams):
     json.dump({'streams' : all_streams}, sys.stdout, indent=2)
+
 
 def do_discovery(conn_config):
     all_streams = []
@@ -451,9 +454,11 @@ def do_discovery(conn_config):
     dump_catalog(all_streams)
     return all_streams
 
+
 def is_selected_via_metadata(stream):
     table_md = metadata.to_map(stream['metadata']).get((), {})
     return table_md.get('selected')
+
 
 def do_sync_full_table(conn_config, stream, state, desired_columns, md_map):
     LOGGER.info("Stream %s is using full_table replication", stream['tap_stream_id'])
@@ -464,7 +469,8 @@ def do_sync_full_table(conn_config, stream, state, desired_columns, md_map):
         state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
     return state
 
-#Possible state keys: replication_key, replication_key_value, version
+
+# Possible state keys: replication_key, replication_key_value, version
 def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
     replication_key = md_map.get((), {}).get('replication-key')
     LOGGER.info("Stream %s is using incremental replication with replication key %s", stream['tap_stream_id'], replication_key)
@@ -481,19 +487,21 @@ def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
 
     return state
 
+
 def clear_state_on_replication_change(state, tap_stream_id, replication_key, replication_method):
-    #user changed replication, nuke state
+    # user changed replication, nuke state
     last_replication_method = singer.get_bookmark(state, tap_stream_id, 'last_replication_method')
     if last_replication_method is not None and (replication_method != last_replication_method):
         state = singer.reset_stream(state, tap_stream_id)
 
-    #key changed
+    # key changed
     if replication_method == 'INCREMENTAL':
         if replication_key != singer.get_bookmark(state, tap_stream_id, 'replication_key'):
             state = singer.reset_stream(state, tap_stream_id)
 
     state = singer.write_bookmark(state, tap_stream_id, 'last_replication_method', replication_method)
     return state
+
 
 def sync_method_for_streams(streams, state, default_replication_method):
     lookup = {}
@@ -549,6 +557,7 @@ def sync_method_for_streams(streams, state, default_replication_method):
 
     return lookup, traditional_steams, logical_streams
 
+
 def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     LOGGER.info("Beginning sync of stream(%s) with sync method(%s)", stream['tap_stream_id'], sync_method)
     md_map = metadata.to_map(stream['metadata'])
@@ -588,6 +597,7 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
     return state
 
+
 def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file):
     if logical_streams:
         LOGGER.info("Pure Logical Replication upto lsn %s for (%s)", end_lsn, list(map(lambda s: s['tap_stream_id'], logical_streams)))
@@ -599,12 +609,12 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
         for s in logical_streams:
             selected_streams.add("{}".format(s['tap_stream_id']))
 
-        new_state = dict(currently_syncing = state['currently_syncing'], bookmarks = {})
+        new_state = dict(currently_syncing=state['currently_syncing'], bookmarks={})
 
         for stream, bookmark in state['bookmarks'].items():
             if bookmark == {}:
                 new_state['bookmarks'][stream] = bookmark
-            elif (bookmark['last_replication_method'] != 'LOG_BASED'):
+            elif bookmark['last_replication_method'] != 'LOG_BASED':
                 new_state['bookmarks'][stream] = bookmark
             elif stream in selected_streams:
                 new_state['bookmarks'][stream] = bookmark
@@ -618,7 +628,7 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
 def register_type_adapters(conn_config):
     with post_db.open_connection(conn_config) as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-            #citext[]
+            # citext[]
             cur.execute("SELECT typarray FROM pg_type where typname = 'citext'")
             citext_array_oid = cur.fetchone()
             if citext_array_oid:
@@ -626,7 +636,7 @@ def register_type_adapters(conn_config):
                     psycopg2.extensions.new_array_type(
                         (citext_array_oid[0],), 'CITEXT[]', psycopg2.STRING))
 
-            #bit[]
+            # bit[]
             cur.execute("SELECT typarray FROM pg_type where typname = 'bit'")
             bit_array_oid = cur.fetchone()[0]
             psycopg2.extensions.register_type(
@@ -634,25 +644,26 @@ def register_type_adapters(conn_config):
                     (bit_array_oid,), 'BIT[]', psycopg2.STRING))
 
 
-            #UUID[]
+            # UUID[]
             cur.execute("SELECT typarray FROM pg_type where typname = 'uuid'")
             uuid_array_oid = cur.fetchone()[0]
             psycopg2.extensions.register_type(
                 psycopg2.extensions.new_array_type(
                     (uuid_array_oid,), 'UUID[]', psycopg2.STRING))
 
-            #money[]
+            # money[]
             cur.execute("SELECT typarray FROM pg_type where typname = 'money'")
             money_array_oid = cur.fetchone()[0]
             psycopg2.extensions.register_type(
                 psycopg2.extensions.new_array_type(
                     (money_array_oid,), 'MONEY[]', psycopg2.STRING))
 
-            #json and jsonb
+            # json and jsonb
+            # pylint: disable=unnecessary-lambda
             psycopg2.extras.register_default_json(loads=lambda x: str(x))
             psycopg2.extras.register_default_jsonb(loads=lambda x: str(x))
 
-            #enum[]'s
+            # enum[]'s
             cur.execute("SELECT distinct(t.typarray) FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid")
             for oid in cur.fetchall():
                 enum_oid = oid[0]
@@ -670,7 +681,8 @@ def any_logical_streams(streams, default_replication_method):
 
     return False
 
-def do_sync(conn_config, catalog, default_replication_method, state, state_file = None):
+
+def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
     streams.sort(key=lambda s: s['tap_stream_id'])
@@ -703,9 +715,10 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file 
         state = sync_logical_streams(conn_config, list(streams), state, end_lsn, state_file)
     return state
 
+
 def parse_args(required_config_keys):
     # fork function to be able to grab path of state file
-    '''Parse standard command-line args.
+    """Parse standard command-line args.
 
     Parses the command-line arguments mentioned in the SPEC and the
     BEST_PRACTICES documents:
@@ -718,8 +731,7 @@ def parse_args(required_config_keys):
 
     Returns the parsed args object from argparse. For each argument that
     point to JSON files (config, state, properties), we will automatically
-    load and parse the JSON file.
-    '''
+    load and parse the JSON file."""
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -766,6 +778,7 @@ def parse_args(required_config_keys):
 
     return args
 
+
 def main_impl():
     args = parse_args(REQUIRED_CONFIG_KEYS)
     conn_config = {'host'     : args.config['host'],
@@ -794,6 +807,7 @@ def main_impl():
         do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties, args.config.get('default_replication_method'), state, state_file)
     else:
         LOGGER.info("No properties were selected")
+
 
 def main():
     try:

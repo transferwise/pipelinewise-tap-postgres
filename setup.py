@@ -24,7 +24,7 @@ setup(name='pipelinewise-tap-postgres',
       extras_require={
           "test": [
               'nose==1.3.7',
-              'pylint==2.4.2'
+              'pylint==2.4.4'
           ]
       },
       entry_points='''

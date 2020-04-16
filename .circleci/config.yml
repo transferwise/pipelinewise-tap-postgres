@@ -39,14 +39,7 @@ jobs:
           name: 'Pylinting'
           command: |
             . ./virtualenvs/tap-postgres/bin/activate
-            pylint --rcfile .pylintrc tap_postgres/
-
-      - run:
-          name: 'Tests'
-          command: |
-            . ./virtualenvs/tap-mysql/bin/activate
-            export LOGGING_CONF_FILE=./sample_logging.conf
-            nosetests -c .noserc tests
+            pylint --rcfile .pylintrc --disable duplicate-code tap_postgres/
 
 workflows:
   version: 2

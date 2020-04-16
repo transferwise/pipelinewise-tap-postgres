@@ -12,6 +12,8 @@ LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
 
+
+# pylint: disable=invalid-name,missing-function-docstring
 def fetch_max_replication_key(conn_config, replication_key, schema_name, table_name):
     with post_db.open_connection(conn_config, False) as conn:
         with conn.cursor() as cur:
@@ -24,6 +26,8 @@ def fetch_max_replication_key(conn_config, replication_key, schema_name, table_n
             LOGGER.info("max replication key value: %s", max_key)
             return max_key
 
+
+# pylint: disable=too-many-locals
 def sync_table(conn_info, stream, state, desired_columns, md_map):
     time_extracted = utils.now()
 
@@ -78,24 +82,33 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                     FROM {}
                                     WHERE {} >= '{}'::{}
                                     ORDER BY {} ASC""".format(','.join(escaped_columns),
-                                                              post_db.fully_qualified_table_name(schema_name, stream['table_name']),
-                                                              post_db.prepare_columns_sql(replication_key), replication_key_value, replication_key_sql_datatype,
+                                                              post_db.fully_qualified_table_name(schema_name,
+                                                                                                 stream['table_name']),
+                                                              post_db.prepare_columns_sql(replication_key),
+                                                              replication_key_value,
+                                                              replication_key_sql_datatype,
                                                               post_db.prepare_columns_sql(replication_key))
                 else:
                     #if not replication_key_value
                     select_sql = """SELECT {}
                                     FROM {}
                                     ORDER BY {} ASC""".format(','.join(escaped_columns),
-                                                              post_db.fully_qualified_table_name(schema_name, stream['table_name']),
+                                                              post_db.fully_qualified_table_name(schema_name,
+                                                                                                 stream['table_name']),
                                                               post_db.prepare_columns_sql(replication_key))
 
-                LOGGER.info("select statement: %s with itersize %s", select_sql, cur.itersize)
+                LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
 
                 rows_saved = 0
 
                 for rec in cur:
-                    record_message = post_db.selected_row_to_singer_message(stream, rec, stream_version, desired_columns, time_extracted, md_map)
+                    record_message = post_db.selected_row_to_singer_message(stream,
+                                                                            rec,
+                                                                            stream_version,
+                                                                            desired_columns,
+                                                                            time_extracted,
+                                                                            md_map)
 
                     singer.write_message(record_message)
                     rows_saved = rows_saved + 1
