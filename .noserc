@@ -2,11 +2,11 @@
 # enable coverage
 with-coverage=1
 
-# cover only the main package tap_mysql
-cover-package=tap_mysql
+# cover only the main package tap_postgres
+cover-package=tap_postgres
 
-# set coverage minimum to 85, it's the current value
-cover-min-percentage=85
+# set coverage minimum to 45, it's the current value
+cover-min-percentage=45
 
 # product html coverage report
 cover-html=1

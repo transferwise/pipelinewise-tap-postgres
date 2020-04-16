@@ -277,7 +277,7 @@ WHERE attnum > 0
 AND NOT a.attisdropped
 AND pg_class.relkind IN ('r', 'v', 'm')
 AND n.nspname NOT in ('pg_toast', 'pg_catalog', 'information_schema')
-AND has_table_privilege(pg_class.oid, 'SELECT') = true """
+AND has_column_privilege(pg_class.oid, attname, 'SELECT') = true """
 
         if filter_schemas:
             sql = post_db.filter_schemas_sql_clause(sql, filter_schemas)
