@@ -2,6 +2,7 @@ import datetime
 import pytz
 import decimal
 import psycopg2
+from psycopg2 import sql
 import copy
 import json
 import singer
@@ -119,14 +120,14 @@ def tuples_to_map(accum, t):
 
 
 def create_hstore_elem_query(elem):
-    return psycopg2.sql.SQL("SELECT hstore_to_array({})").format(psycopg2.sql.Literal(elem))
+    return sql.SQL("SELECT hstore_to_array({})").format(sql.Literal(elem))
 
 
 def create_hstore_elem(conn_info, elem):
     with post_db.open_connection(conn_info) as conn:
         with conn.cursor() as cur:
-            sql_stmt = create_hstore_elem_query(elem)
-            cur.execute(sql_stmt)
+            query = create_hstore_elem_query(elem)
+            cur.execute(query)
             res = cur.fetchone()[0]
             hstore_elem = reduce(tuples_to_map, [res[i:i + 2] for i in range(0, len(res), 2)], {})
             return hstore_elem

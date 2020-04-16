@@ -19,7 +19,7 @@ references:
           POSTGRES_PASSWORD: my-secret-passwd
           POSTGRES_DB: tap_postgres_test
         ports:
-          - 3306:3306
+          - 5432:5432
 
 jobs:
   build:
@@ -40,6 +40,13 @@ jobs:
           command: |
             . ./virtualenvs/tap-postgres/bin/activate
             pylint --rcfile .pylintrc --disable duplicate-code tap_postgres/
+
+      - run:
+          name: 'Tests'
+          command: |
+            . ./virtualenvs/tap-postgres/bin/activate
+            export LOGGING_CONF_FILE=./sample_logging.conf
+            nosetests -c .noserc tests
 
 workflows:
   version: 2
