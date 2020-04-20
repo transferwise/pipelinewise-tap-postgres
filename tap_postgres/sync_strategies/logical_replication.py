@@ -401,6 +401,35 @@ def locate_replication_slot(conn_info):
             raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
 
 
+def streams_to_wal2json_tables(streams):
+    """Converts a list of singer stream dictionaries to wal2json plugin compatible string list.
+    The output is compatible with the 'filter-tables' and 'add-tables' option of wal2json plugin.
+
+    Special characters (space, single quote, comma, period, asterisk) must be escaped with backslash.
+    Schema and table are case-sensitive. Table "public"."Foo bar" should be specified as public. Foo\ bar.
+    Documentation in wal2json plugin: https://github.com/eulerto/wal2json/blob/master/README.md#parameters
+
+    :param streams: List of singer stream dictionaries
+    :return: tables(str): comma separated and escaped list of tables, compatible for wal2json plugin
+    :rtype: str
+    """
+    def escape_spec_chars(string):
+        escaped = string
+        wal2json_special_chars = " ',.*"
+        for ch in wal2json_special_chars:
+            escaped = escaped.replace(ch, f'\\{ch}')
+        return escaped
+
+    tables = []
+    for s in streams:
+        schema_name = escape_spec_chars(s['metadata'][0]['metadata']['schema-name'])
+        table_name = escape_spec_chars(s['table_name'])
+
+        tables.append(f'{schema_name}.{table_name}')
+
+    return ','.join(tables)
+
+
 def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     state_comitted = state
     lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
@@ -418,10 +447,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 10800  # 3 hours
     poll_interval = 10
     poll_timestamp = None
-
-    selected_tables = []
-    for s in logical_streams:
-        selected_tables.append("{}.{}".format(s['metadata'][0]['metadata']['schema-name'], s['table_name']))
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
@@ -444,10 +469,17 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     int_to_lsn(end_lsn),
                     slot)
         # psycopg2 2.8.4 will send a keep-alive message to postgres every status_interval
-        cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, status_interval=poll_interval,
-                              options={'write-in-chunks': 1, 'add-tables': ','.join(selected_tables)})
-    except psycopg2.ProgrammingError:
-        raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
+        cur.start_replication(slot_name=slot,
+                              decode=True,
+                              start_lsn=start_lsn,
+                              status_interval=poll_interval,
+                              options={
+                                  'write-in-chunks': 1,
+                                  'add-tables': streams_to_wal2json_tables(logical_streams)
+                              })
+
+    except psycopg2.ProgrammingError as ex:
+        raise Exception("Unable to start replication with logical replication (slot {})".format(ex))
 
     lsn_received_timestamp = datetime.datetime.utcnow()
     poll_timestamp = datetime.datetime.utcnow()
