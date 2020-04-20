@@ -49,7 +49,7 @@ class TestLogicalReplication(unittest.TestCase):
 
     def test_generate_replication_slot_name(self):
         """Validate if the replication slot name generated correctly"""
-        # Provide only database name: tap_id should be generated
+        # Provide only database name: tap_id should be generated as a random big number
         self.assertTrue(re.compile('^pipelinewise_some_db_\d+$').match(
             logical_replication.generate_replication_slot_name('some_db')))
 
