@@ -401,12 +401,13 @@ def locate_replication_slot(conn_info):
             raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
 
 
+# pylint: disable=anomalous-backslash-in-string
 def streams_to_wal2json_tables(streams):
     """Converts a list of singer stream dictionaries to wal2json plugin compatible string list.
     The output is compatible with the 'filter-tables' and 'add-tables' option of wal2json plugin.
 
     Special characters (space, single quote, comma, period, asterisk) must be escaped with backslash.
-    Schema and table are case-sensitive. Table "public"."Foo bar" should be specified as public. Foo\ bar.
+    Schema and table are case-sensitive. Table "public"."Foo bar" should be specified as "public.Foo\ bar".
     Documentation in wal2json plugin: https://github.com/eulerto/wal2json/blob/master/README.md#parameters
 
     :param streams: List of singer stream dictionaries
