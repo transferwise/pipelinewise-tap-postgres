@@ -18,8 +18,8 @@ import tap_postgres.sync_strategies.common as sync_common
 LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
-MIN_GENERATED_TAP_ID = 900000000        # Used to generate random tap_id if not provided by by config.json
-MAX_GENERATED_TAP_ID = 999999999        # Used to generate random tap_id if not provided by by config.json
+MIN_GENERATED_TAP_ID = 900000000        # To generate random tap_id if not provided in config.json
+MAX_GENERATED_TAP_ID = 999999999        # To generate random tap_id if not provided in config.json
 
 
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
