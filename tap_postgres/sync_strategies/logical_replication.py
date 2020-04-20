@@ -4,7 +4,6 @@ import decimal
 import psycopg2
 from psycopg2 import sql
 import copy
-import random
 import json
 import singer
 import singer.metadata as metadata
