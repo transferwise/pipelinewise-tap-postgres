@@ -420,7 +420,7 @@ def locate_replication_slot(conn_info):
     with post_db.open_connection(conn_info, False) as conn:
         with conn.cursor() as cur:
             db_specific_slot = generate_replication_slot_name(dbname=conn_info['dbname'],
-                                                              tap_id=conn_info.get('tap_id'))
+                                                              tap_id=conn_info['tap_id'])
 
             cur.execute("SELECT * FROM pg_replication_slots WHERE slot_name = %s AND plugin = %s",
                         (db_specific_slot, 'wal2json'))
