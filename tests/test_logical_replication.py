@@ -39,3 +39,26 @@ class TestLogicalReplication(unittest.TestCase):
                          'Case\\ Sensitive\\ Schema\\ With\\ Space.Case\\ Sensitive\\ Table\\ With\\ Space,'
                          'public.table_with_comma_\\,,'
                          "public.table_with_quote_\\'")
+
+    def test_generate_replication_slot_name(self):
+        """Validate if the replication slot name generated correctly"""
+        # Provide only database name
+        self.assertEquals(logical_replication.generate_replication_slot_name('some_db'),
+                          'pipelinewise_some_db')
+
+        # Provide database name and tap_id
+        self.assertEquals(logical_replication.generate_replication_slot_name('some_db',
+                                                                             'some_tap'),
+                          'pipelinewise_some_db_some_tap')
+
+        # Provide database name, tap_id and prefix
+        self.assertEquals(logical_replication.generate_replication_slot_name('some_db',
+                                                                             'some_tap',
+                                                                             prefix='custom_prefix'),
+                          'custom_prefix_some_db_some_tap')
+
+        # Replication slot name should be lowercase
+        self.assertEquals(logical_replication.generate_replication_slot_name('SoMe_DB',
+                                                                             'SoMe_TaP'),
+                          'pipelinewise_some_db_some_tap')
+
