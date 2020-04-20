@@ -1,5 +1,4 @@
 import unittest
-import re
 
 from tap_postgres.sync_strategies import logical_replication
 
@@ -41,17 +40,11 @@ class TestLogicalReplication(unittest.TestCase):
                          'public.table_with_comma_\\,,'
                          "public.table_with_quote_\\'")
 
-    def test_generate_tap_id(self):
-        """Validate if the generated tap_id is between the MIN and MAX range"""
-        self.assertTrue(logical_replication.MIN_GENERATED_TAP_ID <
-                        logical_replication.generate_tap_id() <=
-                        logical_replication.MAX_GENERATED_TAP_ID)
-
     def test_generate_replication_slot_name(self):
         """Validate if the replication slot name generated correctly"""
-        # Provide only database name: tap_id should be generated as a random big number
-        self.assertTrue(re.compile('^pipelinewise_some_db_\d+$').match(
-            logical_replication.generate_replication_slot_name('some_db')))
+        # Provide only database name
+        self.assertEquals(logical_replication.generate_replication_slot_name('some_db'),
+                          'pipelinewise_some_db')
 
         # Provide database name and tap_id
         self.assertEquals(logical_replication.generate_replication_slot_name('some_db',
@@ -64,7 +57,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                              prefix='custom_prefix'),
                           'custom_prefix_some_db_some_tap')
 
-        # Replication slot name should be lowercased
+        # Replication slot name should be lowercase
         self.assertEquals(logical_replication.generate_replication_slot_name('SoMe_DB',
                                                                              'SoMe_TaP'),
                           'pipelinewise_some_db_some_tap')

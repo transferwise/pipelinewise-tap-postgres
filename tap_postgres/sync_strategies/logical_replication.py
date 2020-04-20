@@ -18,8 +18,6 @@ import tap_postgres.sync_strategies.common as sync_common
 LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
-MIN_GENERATED_TAP_ID = 900000000        # To generate random tap_id if not provided in config.json
-MAX_GENERATED_TAP_ID = 999999999        # To generate random tap_id if not provided in config.json
 
 
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
@@ -391,29 +389,22 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     return state
 
 
-def generate_tap_id():
-    """Generating a random tap id for postgres logical replication that
-    uniquely identifies the replication slot. This enables the ability to define
-    one ore more LOG_BASED tap for the same source database
-
-    :return: a random number representing a pseudo unique tap id
-    :rtype: int
-    """
-    return MIN_GENERATED_TAP_ID + random.randint(1, MAX_GENERATED_TAP_ID - MIN_GENERATED_TAP_ID)
-
-
 def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
     """Generate replication slot name with
 
     :param str dbname: Database name that will be part of the replication slot name
-    :param str tap_id: Optional. If not provided then a random number will be generated
+    :param str tap_id: Optional. If provided then it will be appended to the end of the slot name
     :param str prefix: Optional. Defaults to 'pipelinewise'
     :return: well formatted lowercased replication slot name
     :rtype: str
     """
-    if tap_id is None:
-        tap_id = generate_tap_id()
-    return f'{prefix}_{dbname}_{tap_id}'.lower()
+    # Add tap_id to the end of the slot name if provided
+    if tap_id:
+        tap_id = f'_{tap_id}'
+    # Convert None to empty string
+    else:
+        tap_id = ''
+    return f'{prefix}_{dbname}{tap_id}'.lower()
 
 
 def locate_replication_slot(conn_info):
