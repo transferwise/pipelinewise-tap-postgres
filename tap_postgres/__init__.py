@@ -396,6 +396,7 @@ def discover_columns(connection, table_info):
 
 
 def discover_db(connection, filter_schemas=None):
+    LOGGER.info("Discovering db %s", connection['dbname'])
     table_info = produce_table_info(connection, filter_schemas)
     db_streams = discover_columns(connection, table_info)
     return db_streams
