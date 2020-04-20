@@ -4,6 +4,7 @@ import decimal
 import psycopg2
 from psycopg2 import sql
 import copy
+import random
 import json
 import singer
 import singer.metadata as metadata
@@ -17,6 +18,8 @@ import tap_postgres.sync_strategies.common as sync_common
 LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
+MIN_GENERATED_TAP_ID = 900000000        # Used to generate random tap_id if not provided by by config.json
+MAX_GENERATED_TAP_ID = 999999999        # Used to generate random tap_id if not provided by by config.json
 
 
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
@@ -388,10 +391,37 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     return state
 
 
+def generate_tap_id():
+    """Generating a random tap id for postgres logical replication that
+    uniquely identifies the replication slot. This enables the ability to define
+    one ore more LOG_BASED tap for the same source database
+
+    :return: a random number representing a pseudo unique tap id
+    :rtype: int
+    """
+    return MIN_GENERATED_TAP_ID + random.randint(1, MAX_GENERATED_TAP_ID - MIN_GENERATED_TAP_ID)
+
+
+def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
+    """Generate replication slot name with
+
+    :param str dbname: Database name that will be part of the replication slot name
+    :param str tap_id: Optional. If not provided then a random number will be generated
+    :param str prefix: Optional. Defaults to 'pipelinewise'
+    :return: well formatted lowercased replication slot name
+    :rtype: str
+    """
+    if tap_id is None:
+        tap_id = generate_tap_id()
+    return f'{prefix}_{dbname}_{tap_id}'.lower()
+
+
 def locate_replication_slot(conn_info):
     with post_db.open_connection(conn_info, False) as conn:
         with conn.cursor() as cur:
-            db_specific_slot = "pipelinewise_{}".format(conn_info['dbname'].lower())
+            db_specific_slot = generate_replication_slot_name(dbname=conn_info['dbname'],
+                                                              tap_id=conn_info.get('tap_id'))
+
             cur.execute("SELECT * FROM pg_replication_slots WHERE slot_name = %s AND plugin = %s",
                         (db_specific_slot, 'wal2json'))
             if len(cur.fetchall()) == 1:

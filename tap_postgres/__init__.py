@@ -416,43 +416,18 @@ def attempt_connection_to_db(conn_config, dbname):
 
 
 def dump_catalog(all_streams):
-    json.dump({'streams' : all_streams}, sys.stdout, indent=2)
+    json.dump({'streams': all_streams}, sys.stdout, indent=2)
 
 
 def do_discovery(conn_config):
-    all_streams = []
-
     with post_db.open_connection(conn_config) as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
-            cur.itersize = post_db.cursor_iter_size
-            sql = """SELECT datname
-            FROM pg_database
-            WHERE datistemplate = false
-              AND datname != 'rdsadmin'"""
+        streams = discover_db(conn, conn_config.get('filter_schemas'))
 
-            if conn_config.get('filter_dbs'):
-                sql = post_db.filter_dbs_sql_clause(sql, conn_config['filter_dbs'])
-
-            LOGGER.info("Running DB discovery: %s with itersize %s", sql, cur.itersize)
-            cur.execute(sql)
-            found_dbs = (row[0] for row in cur.fetchall())
-
-    filter_dbs = filter(lambda dbname: attempt_connection_to_db(conn_config, dbname), found_dbs)
-
-    for db_row in filter_dbs:
-        dbname = db_row
-        LOGGER.info("Discovering db %s", dbname)
-        conn_config['dbname'] = dbname
-        with post_db.open_connection(conn_config) as conn:
-            db_streams = discover_db(conn, conn_config.get('filter_schemas'))
-            all_streams = all_streams + db_streams
-
-
-    if len(all_streams) == 0:
+    if len(streams) == 0:
         raise RuntimeError('0 tables were discovered across the entire cluster')
 
-    dump_catalog(all_streams)
-    return all_streams
+    dump_catalog(streams)
+    return streams
 
 
 def is_selected_via_metadata(stream):
@@ -781,18 +756,22 @@ def parse_args(required_config_keys):
 
 def main_impl():
     args = parse_args(REQUIRED_CONFIG_KEYS)
-    conn_config = {'host'     : args.config['host'],
-                   'user'     : args.config['user'],
-                   'password' : args.config['password'],
-                   'port'     : args.config['port'],
-                   'dbname'   : args.config['dbname'],
-                   'filter_dbs' : args.config.get('filter_dbs'),
-                   'filter_schemas' : args.config.get('filter_schemas'),
-                   'debug_lsn' : args.config.get('debug_lsn') == 'true',
-                   'max_run_seconds' : args.config.get('max_run_seconds', 43200),
-                   'break_at_end_lsn' : args.config.get('break_at_end_lsn', True),
-                   'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))
-                   }
+    conn_config = {
+        # Required config keys
+        'host': args.config['host'],
+        'user': args.config['user'],
+        'password': args.config['password'],
+        'port': args.config['port'],
+        'dbname': args.config['dbname'],
+
+        # Optional config keys
+        'tap_id': args.config.get('tap_id'),
+        'filter_schemas': args.config.get('filter_schemas'),
+        'debug_lsn': args.config.get('debug_lsn') == 'true',
+        'max_run_seconds': args.config.get('max_run_seconds', 43200),
+        'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
+        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))
+    }
 
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
