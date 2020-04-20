@@ -396,7 +396,6 @@ def discover_columns(connection, table_info):
 
 
 def discover_db(connection, filter_schemas=None):
-    LOGGER.info("Discovering db %s", connection['dbname'])
     table_info = produce_table_info(connection, filter_schemas)
     db_streams = discover_columns(connection, table_info)
     return db_streams
@@ -422,6 +421,7 @@ def dump_catalog(all_streams):
 
 def do_discovery(conn_config):
     with post_db.open_connection(conn_config) as conn:
+        LOGGER.info("Discovering db %s", conn_config['dbname'])
         streams = discover_db(conn, conn_config.get('filter_schemas'))
 
     if len(streams) == 0:
