@@ -1,3 +1,8 @@
+1.6.1 (2020-05-07)
+-------------------
+
+- Fixed an issue when existing replication slot not found
+
 1.6.0 (2020-04-20)
 -------------------
 
