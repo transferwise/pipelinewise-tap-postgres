@@ -417,13 +417,13 @@ def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
     # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
     cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v15}'")
     if len(cursor.fetchall()) == 1:
-        LOGGER.info("Using pg_replication_slot %s", slot_name_v15)
+        LOGGER.info('Using pg_replication_slot %s', slot_name_v15)
         return slot_name_v15
 
     # v15 style replication slot not found, try to locate v16
     cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v16}'")
     if len(cursor.fetchall()) == 1:
-        LOGGER.info("Using pg_replication_slot %s", slot_name_v16)
+        LOGGER.info('Using pg_replication_slot %s', slot_name_v16)
         return slot_name_v16
 
     raise ReplicationSlotNotFoundError(f'Unable to find replication slot {slot_name_v16}')
