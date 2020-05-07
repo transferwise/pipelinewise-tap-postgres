@@ -19,6 +19,10 @@ LOGGER = singer.get_logger('tap_postgres')
 UPDATE_BOOKMARK_PERIOD = 10000
 
 
+class ReplicationSlotNotFoundError(Exception):
+    """Custom exception when replication slot not found"""
+
+
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
 def get_pg_version(conn_info):
     with post_db.open_connection(conn_info, False) as conn:
@@ -406,19 +410,29 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
     return f'{prefix}_{dbname}{tap_id}'.lower()
 
 
+def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
+    slot_name_v15 = generate_replication_slot_name(dbname)
+    slot_name_v16 = generate_replication_slot_name(dbname, tap_id)
+
+    # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
+    cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v15}'")
+    if len(cursor.fetchall()) == 1:
+        LOGGER.info('Using pg_replication_slot %s', slot_name_v15)
+        return slot_name_v15
+
+    # v15 style replication slot not found, try to locate v16
+    cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v16}'")
+    if len(cursor.fetchall()) == 1:
+        LOGGER.info('Using pg_replication_slot %s', slot_name_v16)
+        return slot_name_v16
+
+    raise ReplicationSlotNotFoundError(f'Unable to find replication slot {slot_name_v16}')
+
+
 def locate_replication_slot(conn_info):
     with post_db.open_connection(conn_info, False) as conn:
         with conn.cursor() as cur:
-            db_specific_slot = generate_replication_slot_name(dbname=conn_info['dbname'],
-                                                              tap_id=conn_info['tap_id'])
-
-            cur.execute("SELECT * FROM pg_replication_slots WHERE slot_name = %s AND plugin = %s",
-                        (db_specific_slot, 'wal2json'))
-            if len(cur.fetchall()) == 1:
-                LOGGER.info("Using pg_replication_slot %s", db_specific_slot)
-                return db_specific_slot
-
-            raise Exception("Unable to find replication slot {} with wal2json".format(db_specific_slot))
+            return locate_replication_slot_by_cur(cur, conn_info['dbname'], conn_info['tap_id'])
 
 
 # pylint: disable=anomalous-backslash-in-string
