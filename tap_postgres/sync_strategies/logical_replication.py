@@ -20,7 +20,7 @@ UPDATE_BOOKMARK_PERIOD = 10000
 
 
 class ReplicationSlotNotFoundError(Exception):
-    pass
+    """Custom exception when replication slot not found"""
 
 
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
