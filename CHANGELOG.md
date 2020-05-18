@@ -1,3 +1,8 @@
+1.6.2 (2020-05-18)
+-------------------
+
+- Fixed issue when JSON type not converted to dictionary
+
 1.6.1 (2020-05-07)
 -------------------
 
