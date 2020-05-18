@@ -3,7 +3,7 @@ import unittest
 from tap_postgres import db
 
 
-class ValueToSingerValue(unittest.TestCase):
+class TestDbFunctions(unittest.TestCase):
     maxDiff = None
 
     def setUp(self):
