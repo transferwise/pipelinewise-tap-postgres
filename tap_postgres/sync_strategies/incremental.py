@@ -75,7 +75,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                 LOGGER.info("hstore is UNavailable")
 
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
-                cur.itersize = post_db.cursor_iter_size
+                cur.itersize = post_db.CURSOR_ITER_SIZE
                 LOGGER.info("Beginning new incremental replication sync %s", stream_version)
                 if replication_key_value:
                     select_sql = """SELECT {}

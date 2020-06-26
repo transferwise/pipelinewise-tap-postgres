@@ -62,7 +62,7 @@ def produce_table_info(conn, filter_schemas=None, tables: Optional[List[str]] = 
     # where typlen = -1 and typelem != 0 and pga.attndims > 0;
 
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
-        cur.itersize = post_db.cursor_iter_size
+        cur.itersize = post_db.CURSOR_ITER_SIZE
         table_info = {}
         # SELECT CASE WHEN $2.typtype = 'd' THEN $2.typbasetype ELSE $1.atttypid END
         sql = """

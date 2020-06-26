@@ -40,7 +40,7 @@ def sync_view(conn_info, stream, state, desired_columns, md_map):
     with metrics.record_counter(None) as counter:
         with post_db.open_connection(conn_info) as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
-                cur.itersize = post_db.cursor_iter_size
+                cur.itersize = post_db.CURSOR_ITER_SIZE
                 select_sql = 'SELECT {} FROM {}'.format(','.join(escaped_columns),
                                                         post_db.fully_qualified_table_name(schema_name,
                                                                                            stream['table_name']))
@@ -119,7 +119,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                 LOGGER.info("hstore is UNavailable")
 
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
-                cur.itersize = post_db.cursor_iter_size
+                cur.itersize = post_db.CURSOR_ITER_SIZE
 
                 fq_table_name = post_db.fully_qualified_table_name(schema_name, stream['table_name'])
                 xmin = singer.get_bookmark(state, stream['tap_stream_id'], 'xmin')

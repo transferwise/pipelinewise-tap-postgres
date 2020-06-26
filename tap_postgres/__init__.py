@@ -409,7 +409,7 @@ def main_impl():
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
 
-    post_db.cursor_iter_size = int(args.config.get('itersize', post_db.cursor_iter_size))
+    post_db.CURSOR_ITER_SIZE = int(args.config.get('itersize', post_db.CURSOR_ITER_SIZE))
 
     if args.discover:
         do_discovery(conn_config)
