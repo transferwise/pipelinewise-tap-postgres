@@ -67,22 +67,22 @@ class TestLogicalReplication(unittest.TestCase):
     def test_generate_replication_slot_name(self):
         """Validate if the replication slot name generated correctly"""
         # Provide only database name
-        self.assertEquals(logical_replication.generate_replication_slot_name('some_db'),
+        self.assertEqual(logical_replication.generate_replication_slot_name('some_db'),
                           'pipelinewise_some_db')
 
         # Provide database name and tap_id
-        self.assertEquals(logical_replication.generate_replication_slot_name('some_db',
+        self.assertEqual(logical_replication.generate_replication_slot_name('some_db',
                                                                              'some_tap'),
                           'pipelinewise_some_db_some_tap')
 
         # Provide database name, tap_id and prefix
-        self.assertEquals(logical_replication.generate_replication_slot_name('some_db',
+        self.assertEqual(logical_replication.generate_replication_slot_name('some_db',
                                                                              'some_tap',
                                                                              prefix='custom_prefix'),
                           'custom_prefix_some_db_some_tap')
 
         # Replication slot name should be lowercase
-        self.assertEquals(logical_replication.generate_replication_slot_name('SoMe_DB',
+        self.assertEqual(logical_replication.generate_replication_slot_name('SoMe_DB',
                                                                              'SoMe_TaP'),
                           'pipelinewise_some_db_some_tap')
 
@@ -90,28 +90,28 @@ class TestLogicalReplication(unittest.TestCase):
         """Validate if both v15 and v16 style replication slot located correctly"""
         # Should return v15 style slot name if v15 style replication slot exists
         cursor = PostgresCurReplicationSlotMock(existing_slot_name='pipelinewise_some_db')
-        self.assertEquals(logical_replication.locate_replication_slot_by_cur(cursor,
+        self.assertEqual(logical_replication.locate_replication_slot_by_cur(cursor,
                                                                              'some_db',
                                                                              'some_tap'),
                           'pipelinewise_some_db')
 
         # Should return v16 style slot name if v16 style replication slot exists
         cursor = PostgresCurReplicationSlotMock(existing_slot_name='pipelinewise_some_db_some_tap')
-        self.assertEquals(logical_replication.locate_replication_slot_by_cur(cursor,
+        self.assertEqual(logical_replication.locate_replication_slot_by_cur(cursor,
                                                                              'some_db',
                                                                              'some_tap'),
                           'pipelinewise_some_db_some_tap')
 
         # Should return v15 style replication slot if tap_id not provided and the v15 slot exists
         cursor = PostgresCurReplicationSlotMock(existing_slot_name='pipelinewise_some_db')
-        self.assertEquals(logical_replication.locate_replication_slot_by_cur(cursor,
+        self.assertEqual(logical_replication.locate_replication_slot_by_cur(cursor,
                                                                              'some_db'),
                           'pipelinewise_some_db')
 
         # Should raise an exception if no v15 or v16 style replication slot found
         cursor = PostgresCurReplicationSlotMock(existing_slot_name=None)
         with self.assertRaises(logical_replication.ReplicationSlotNotFoundError):
-            self.assertEquals(logical_replication.locate_replication_slot_by_cur(cursor,
+            self.assertEqual(logical_replication.locate_replication_slot_by_cur(cursor,
                                                                                  'some_db',
                                                                                  'some_tap'),
                               'pipelinewise_some_db_some_tap')

@@ -1,6 +1,8 @@
 import unittest
 import psycopg2
 import tap_postgres
+from tap_postgres.discovery_utils import BASE_RECURSIVE_SCHEMAS
+
 import tap_postgres.db as post_db
 from singer import get_logger, metadata
 from psycopg2.extensions import quote_ident
@@ -19,6 +21,7 @@ tap_postgres.dump_catalog = do_not_dump_catalog
 class TestStringTableWithPK(unittest.TestCase):
     maxDiff = None
     table_name = 'CHICKEN TIMES'
+
     def setUp(self):
        table_spec = {"columns": [{"name" : "id", "type" : "integer", "primary_key" : True, "serial" : True},
                                  {"name" : '"character-varying_name"',  "type": "character varying"},
@@ -58,7 +61,7 @@ class TestStringTableWithPK(unittest.TestCase):
                                          'char_name':              {'type': ['null', 'string'], 'maxLength': 10},
                                          'text-name':              {'type': ['null', 'string']}},
                           'type': 'object',
-                          'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},  stream_dict.get('schema'))
+                          'definitions' : BASE_RECURSIVE_SCHEMAS},  stream_dict.get('schema'))
 
 
 class TestIntegerTable(unittest.TestCase):
@@ -94,7 +97,7 @@ class TestIntegerTable(unittest.TestCase):
                           ('properties', 'size smallint')        : {'inclusion': 'available', 'sql-datatype' : 'smallint', 'selected-by-default' : True},
                           ('properties', 'size bigint')          : {'inclusion': 'available', 'sql-datatype' : 'bigint',   'selected-by-default' : True}})
 
-        self.assertEqual({'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS,
+        self.assertEqual({'definitions' : BASE_RECURSIVE_SCHEMAS,
                           'type': 'object',
                           'properties': {'id': {'type': ['null', 'integer'], 'minimum': -2147483648, 'maximum': 2147483647},
                                          'size smallint': {'type': ['null', 'integer'], 'minimum': -32768, 'maximum': 32767},
@@ -149,7 +152,7 @@ class TestDecimalPK(unittest.TestCase):
                                                               'multipleOf': 0.0001,
                                                               'type': ['null', 'number']}},
                           'type': 'object',
-                          'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                          'definitions' : BASE_RECURSIVE_SCHEMAS},
                          stream_dict.get('schema'))
 
 
@@ -191,7 +194,7 @@ class TestDatesTablePK(unittest.TestCase):
                                          'our_time':               {'format': 'time', 'type': ['null', 'string']},
                                          'our_time_tz':            {'format': 'time', 'type': ['null', 'string']}},
                           'type': 'object',
-                          'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                          'definitions' : BASE_RECURSIVE_SCHEMAS},
                          stream_dict.get('schema'))
 
 class TestFloatTablePK(unittest.TestCase):
@@ -224,7 +227,7 @@ class TestFloatTablePK(unittest.TestCase):
                                          'our_real':                {'type': ['null', 'number']},
                                          'our_double':       {'type': ['null', 'number']}},
                           'type': 'object',
-                          'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                          'definitions' : BASE_RECURSIVE_SCHEMAS},
                          stream_dict.get('schema'))
 
 class TestBoolsAndBits(unittest.TestCase):
@@ -253,7 +256,7 @@ class TestBoolsAndBits(unittest.TestCase):
 
         self.assertEqual({'properties': {'our_bool':               {'type': ['null', 'boolean']},
                                          'our_bit':                {'type': ['null', 'boolean']}},
-                          'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS,
+                          'definitions' : BASE_RECURSIVE_SCHEMAS,
                           'type': 'object'},
                          stream_dict.get('schema'))
 
@@ -284,7 +287,7 @@ class TestJsonTables(unittest.TestCase):
 
         self.assertEqual({'properties': {'our_secrets':                  {'type': ['null', 'object', 'array']},
                                          'our_secrets_b':                {'type': ['null', 'object', 'array']}},
-                          'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS,
+                          'definitions' : BASE_RECURSIVE_SCHEMAS,
                           'type': 'object'},
                          stream_dict.get('schema'))
 
@@ -317,7 +320,7 @@ class TestUUIDTables(unittest.TestCase):
         self.assertEqual({'properties': {'our_uuid':                  {'type': ['null', 'string']},
                                          'our_pk':                    {'type': ['string']}},
                           'type': 'object',
-                          'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                          'definitions' : BASE_RECURSIVE_SCHEMAS},
                          stream_dict.get('schema'))
 
 class TestHStoreTable(unittest.TestCase):
@@ -359,7 +362,7 @@ class TestHStoreTable(unittest.TestCase):
                 self.assertEqual({'properties': {'our_hstore':                  {'type': ['null', 'object'], 'properties' : {}},
                                                  'our_pk':                    {'type': ['object'], 'properties': {}}},
                                   'type': 'object',
-                                  'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                                  'definitions' : BASE_RECURSIVE_SCHEMAS},
                                  stream_dict.get('schema'))
 
     def test_escaping_values(self):
@@ -410,7 +413,7 @@ class TestEnumTable(unittest.TestCase):
                 self.assertEqual({'properties': {'our_mood_enum':                  {'type': ['null', 'string']},
                                                  'our_mood_enum_pk':               {'type': ['string']}},
                                   'type': 'object',
-                                  'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                                  'definitions' : BASE_RECURSIVE_SCHEMAS},
                                  stream_dict.get('schema'))
 
 
@@ -446,7 +449,7 @@ class TestMoney(unittest.TestCase):
                 self.assertEqual({'properties': {'our_money':                  {'type': ['null', 'string']},
                                                  'our_money_pk':               {'type': ['string']}},
                                   'type': 'object',
-                                  'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                                  'definitions' : BASE_RECURSIVE_SCHEMAS},
                                  stream_dict.get('schema'))
 
 class TestArraysTable(unittest.TestCase):
@@ -481,7 +484,7 @@ class TestArraysTable(unittest.TestCase):
                 self.assertEqual({'properties': {'our_int_array_pk':                  {'type': ['null', 'array'], 'items' : {'$ref': '#/definitions/sdc_recursive_integer_array'}},
                                                  'our_string_array':                  {'type': ['null', 'array'], 'items' : {'$ref': '#/definitions/sdc_recursive_string_array'}}},
                                   'type': 'object',
-                                  'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                                  'definitions' : BASE_RECURSIVE_SCHEMAS},
                                  stream_dict.get('schema'))
 
 
@@ -525,7 +528,7 @@ class TestArraysLikeTable(unittest.TestCase):
                 self.assertEqual({'properties': {'our_int_array_pk':                  {'type': ['null', 'array'], 'items' : {'$ref': '#/definitions/sdc_recursive_integer_array'}},
                                                  'our_text_array':                    {'type': ['null', 'array'], 'items' : {'$ref': '#/definitions/sdc_recursive_string_array'}}},
                                   'type': 'object',
-                                  'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS},
+                                  'definitions' : BASE_RECURSIVE_SCHEMAS},
                                  stream_dict.get('schema'))
 
 class TestColumnGrants(unittest.TestCase):
@@ -585,15 +588,9 @@ class TestColumnGrants(unittest.TestCase):
                                                  'selected-by-default': True,
                                                  'sql-datatype': 'integer'}})
         
-        self.assertEqual({'definitions' : tap_postgres.BASE_RECURSIVE_SCHEMAS,
+        self.assertEqual({'definitions' : BASE_RECURSIVE_SCHEMAS,
                           'type': 'object',
                           'properties': {'id': {'type': ['null', 'integer'],
                                                 'minimum': -2147483648,
                                                 'maximum': 2147483647}}},
                          stream_dict.get('schema'))
-
-
-if __name__== "__main__":
-    test1 = TestArraysTable()
-    test1.setUp()
-    test1.test_catalog()

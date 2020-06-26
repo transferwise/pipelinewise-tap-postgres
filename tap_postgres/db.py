@@ -1,13 +1,15 @@
+import copy
 import datetime
 import json
-
-import pytz
-from dateutil.parser import parse
 import decimal
 import math
+import pytz
 import psycopg2
 import psycopg2.extras
 import singer
+
+from typing import List
+from dateutil.parser import parse
 
 LOGGER = singer.get_logger('tap_postgres')
 
@@ -233,3 +235,27 @@ def numeric_max(precision, scale):
 
 def numeric_min(precision, scale):
     return -10 ** (precision - scale)
+
+
+def filter_tables_sql_clause(sql, tables: List[str]):
+    in_clause = " AND pg_class.relname in (" + ",".join(["'{}'".format(b.strip(' ')) for b in tables]) + ")"
+    return sql + in_clause
+
+def get_database_name(connection):
+    cur = connection.cursor()
+    rows = cur.execute("SELECT name FROM v$database").fetchall()
+    return rows[0][0]
+
+def attempt_connection_to_db(conn_config, dbname):
+    nascent_config = copy.deepcopy(conn_config)
+    nascent_config['dbname'] = dbname
+    LOGGER.info('(%s) Testing connectivity...', dbname)
+    try:
+        conn = open_connection(nascent_config)
+        LOGGER.info('(%s) connectivity verified', dbname)
+        conn.close()
+        return True
+    except Exception as err:
+        LOGGER.warning('Unable to connect to %s. This maybe harmless if you '
+                       'have not desire to replicate from this database: "%s"', dbname, err)
+        return False

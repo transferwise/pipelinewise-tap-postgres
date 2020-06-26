@@ -6,9 +6,6 @@ from tap_postgres import db
 class TestDbFunctions(unittest.TestCase):
     maxDiff = None
 
-    def setUp(self):
-        pass
-
     def test_value_to_singer_value(self):
         """Test if every element converted from sql_datatype to the correct singer type"""
         # JSON and JSONB should be converted to dictionaries

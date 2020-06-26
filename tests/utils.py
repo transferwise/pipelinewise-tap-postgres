@@ -1,13 +1,12 @@
-from singer import get_logger, metadata
-from nose.tools import nottest
 import psycopg2
 import singer
 import os
 import decimal
 import math
 import datetime
-import pdb
+
 from psycopg2.extensions import quote_ident
+from singer import get_logger, metadata
 
 LOGGER = get_logger()
 
@@ -17,15 +16,14 @@ def get_test_connection_config(target_db='postgres'):
                                 os.getenv('TAP_POSTGRES_PASSWORD'),
                                 os.getenv('TAP_POSTGRES_PORT')] if x == None]
     if len(missing_envs) != 0:
-        #pylint: disable=line-too-long
         raise Exception("set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT")
 
-    conn_config = {}
-    conn_config['host'] = os.environ.get('TAP_POSTGRES_HOST')
-    conn_config['user'] = os.environ.get('TAP_POSTGRES_USER')
-    conn_config['password'] = os.environ.get('TAP_POSTGRES_PASSWORD')
-    conn_config['port'] = os.environ.get('TAP_POSTGRES_PORT')
-    conn_config['dbname'] = target_db
+    conn_config = {'host': os.environ.get('TAP_POSTGRES_HOST'),
+                   'user': os.environ.get('TAP_POSTGRES_USER'),
+                   'password': os.environ.get('TAP_POSTGRES_PASSWORD'),
+                   'port': os.environ.get('TAP_POSTGRES_PORT'),
+                   'dbname': target_db}
+
     return conn_config
 
 def get_test_connection(target_db='postgres'):
@@ -63,7 +61,6 @@ def build_table(table, cur):
 
     return sql
 
-@nottest
 def ensure_test_table(table_spec, target_db='postgres'):
     with get_test_connection(target_db) as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
