@@ -46,7 +46,7 @@ jobs:
           command: |
             . ./virtualenvs/tap-postgres/bin/activate
             export LOGGING_CONF_FILE=./sample_logging.conf
-            nosetests -c .noserc tests
+            pytest --cov=tap_postgres tests
 
 workflows:
   version: 2

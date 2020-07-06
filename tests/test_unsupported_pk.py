@@ -1,17 +1,9 @@
 import unittest
+
+from singer import get_logger, metadata
+
 import tap_postgres
-import psycopg2
-import psycopg2.extras
-import os
-import pdb
-import singer
-from singer import get_logger, metadata, write_bookmark
-from tests.utils import get_test_connection, ensure_test_table, select_all_of_stream, set_replication_method_for_stream, insert_record, get_test_connection_config
-import decimal
-import math
-import pytz
-import strict_rfc3339
-import copy
+from tests.utils import get_test_connection, ensure_test_table, get_test_connection_config
 
 LOGGER = get_logger()
 
@@ -25,28 +17,26 @@ class Unsupported(unittest.TestCase):
     table_name = 'CHICKEN TIMES'
 
     def setUp(self):
+        table_spec = {"columns": [{"name": "interval_col",   "type": "INTERVAL"},
+                                  {"name": "bit_string_col", "type": "bit(5)"},
+                                  {"name": "bytea_col",      "type": "bytea"},
+                                  {"name": "point_col",      "type": "point"},
+                                  {"name": "line_col",      "type": "line"},
+                                  {"name": "lseg_col",      "type": "lseg"},
+                                  {"name": "box_col",      "type": "box"},
+                                  {"name": "polygon_col",      "type": "polygon"},
+                                  {"name": "circle_col",      "type": "circle"},
+                                  {"name": "xml_col",      "type": "xml"},
+                                  {"name": "composite_col",      "type": "person_composite"},
+                                  {"name": "int_range_col",      "type": "int4range"},
+        ],
+                      "name": Unsupported.table_name}
         with get_test_connection() as conn:
             cur = conn.cursor()
-            table_spec = {"columns": [{"name": "interval_col",   "type": "INTERVAL"},
-                                      {"name": "bit_string_col", "type": "bit(5)"},
-                                      {"name": "bytea_col",      "type": "bytea"},
-                                      {"name": "point_col",      "type": "point"},
-                                      {"name": "line_col",      "type": "line"},
-                                      {"name": "lseg_col",      "type": "lseg"},
-                                      {"name": "box_col",      "type": "box"},
-                                      {"name": "polygon_col",      "type": "polygon"},
-                                      {"name": "circle_col",      "type": "circle"},
-                                      {"name": "xml_col",      "type": "xml"},
-                                      {"name": "composite_col",      "type": "person_composite"},
-                                      {"name": "int_range_col",      "type": "int4range"},
-            ],
-                          "name": Unsupported.table_name}
-            with get_test_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("""     DROP TYPE IF EXISTS person_composite CASCADE """)
-                cur.execute("""     CREATE TYPE person_composite AS (age int, name text) """)
+            cur.execute("""     DROP TYPE IF EXISTS person_composite CASCADE """)
+            cur.execute("""     CREATE TYPE person_composite AS (age int, name text) """)
 
-            ensure_test_table(table_spec)
+        ensure_test_table(table_spec)
 
     def test_catalog(self):
         conn_config = get_test_connection_config()
@@ -72,9 +62,3 @@ class Unsupported(unittest.TestCase):
                           ('properties', 'interval_col'):       {'sql-datatype': 'interval', 'selected-by-default': False, 'inclusion': 'unsupported'},
                           ('properties', 'point_col'):          {'sql-datatype': 'point', 'selected-by-default': False, 'inclusion': 'unsupported'}}
         )
-
-
-if __name__== "__main__":
-    test1 = Unsupported()
-    test1.setUp()
-    test1.test_catalog()
