@@ -32,8 +32,14 @@ jobs:
           command: |
             python3 -m venv ./virtualenvs/tap-postgres
             . ./virtualenvs/tap-postgres/bin/activate
-            pip install --upgrade pip
+            pip install --upgrade pip setuptools
             pip install -e .[test]
+
+      - run:
+          name: Check dependencies for conflict
+          command: |
+            . ./virtualenvs/tap-postgres/bin/activate
+            pip check && echo "No conflicts" || exit 1
 
       - run:
           name: 'Pylinting'
