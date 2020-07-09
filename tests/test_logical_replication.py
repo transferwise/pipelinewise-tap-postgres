@@ -1,6 +1,11 @@
+import json
 import unittest
 
+from collections import namedtuple
+from unittest.mock import patch
+
 from tap_postgres.sync_strategies import logical_replication
+from tap_postgres.sync_strategies.logical_replication import UnsupportedPayloadKindError
 
 
 class PostgresCurReplicationSlotMock:
@@ -31,7 +36,7 @@ class TestLogicalReplication(unittest.TestCase):
     maxDiff = None
 
     def setUp(self):
-        pass
+        self.WalMessage = namedtuple('WalMessage', ['payload', 'data_start'])
 
     def test_streams_to_wal2json_tables(self):
         """Validate if table names are escaped to wal2json format"""
@@ -115,3 +120,126 @@ class TestLogicalReplication(unittest.TestCase):
                                                                                  'some_db',
                                                                                  'some_tap'),
                               'pipelinewise_some_db_some_tap')
+
+    def test_consume_with_message_payload_is_not_json_expect_same_state(self):
+
+        output = logical_replication.consume_message([],
+                                            {},
+                                            self.WalMessage(payload='this is an invalid json message', data_start=None),
+                                            None,
+                                            {}
+                                            )
+        self.assertDictEqual({}, output)
+
+    def test_consume_with_message_stream_in_payload_is_not_selected_expect_same_state(self):
+        output = logical_replication.consume_message(
+            [{'tap_stream_id': 'myschema-mytable'}],
+            {},
+            self.WalMessage(payload='{"schema": "myschema", "table": "notmytable"}',
+                            data_start='some lsn'),
+            None,
+            {}
+        )
+
+        self.assertDictEqual({}, output)
+
+    def test_consume_with_payload_kind_is_not_supported_expect_exception(self):
+
+        with self.assertRaises(UnsupportedPayloadKindError):
+            logical_replication.consume_message(
+                [{'tap_stream_id': 'myschema-mytable'}],
+                {},
+                self.WalMessage(payload='{"kind":"truncate", "schema": "myschema", "table": "mytable"}',
+                                data_start='some lsn'),
+                None,
+                {}
+            )
+    @patch('tap_postgres.logical_replication.singer.write_message')
+    @patch('tap_postgres.logical_replication.sync_common.send_schema_message')
+    @patch('tap_postgres.logical_replication.refresh_streams_schema')
+    def test_consume_message_with_new_column_in_payload_will_refresh_schema(self,
+                                                                            refresh_schema_mock,
+                                                                            send_schema_mock,
+                                                                            write_message_mock):
+        streams = [
+                {
+                    'tap_stream_id': 'myschema-mytable',
+                    'stream': 'mytable',
+                    'schema': {
+                        'properties': {
+                            'id': {},
+                            'date_created': {}
+                        }
+                    },
+                    'metadata': [
+                        {
+                            'breadcrumb': [],
+                            'metadata': {
+                                'is-view': False,
+                                'table-key-properties': ['id'],
+                                'schema-name': 'myschema'
+                            }
+                        },
+                        {
+                            "breadcrumb": [
+                                "properties",
+                                "id"
+                            ],
+                            "metadata": {
+                                "sql-datatype": "integer",
+                                "inclusion": "automatic",
+                            }
+                        },
+                        {
+                            "breadcrumb": [
+                                "properties",
+                                "date_created"
+                            ],
+                            "metadata": {
+                                "sql-datatype": "datetime",
+                                "inclusion": "available",
+                                "selected": True
+                            }
+                        }
+                    ],
+                }
+            ]
+
+        return_v = logical_replication.consume_message(
+            streams,
+            {
+                'bookmarks': {
+                    "myschema-mytable": {
+                        "last_replication_method": "LOG_BASED",
+                        "lsn": None,
+                        "version": 1000,
+                        "xmin": None
+                    }
+                }
+            },
+            self.WalMessage(payload='{"kind": "insert", '
+                                    '"schema": "myschema", '
+                                    '"table": "mytable",'
+                                    '"columnnames": ["id", "date_created", "new_col"],'
+                                    '"columnnames": [1, null, "some random text"]'
+                                    '}',
+                            data_start='some lsn'),
+            None,
+            {}
+        )
+
+        self.assertDictEqual(return_v,
+                          {
+                              'bookmarks': {
+                                  "myschema-mytable": {
+                                      "last_replication_method": "LOG_BASED",
+                                      "lsn": "some lsn",
+                                      "version": 1000,
+                                      "xmin": None
+                                  }
+                              }
+                          })
+
+        refresh_schema_mock.assert_called_once_with({}, [streams[0]])
+        send_schema_mock.assert_called_once()
+        write_message_mock.assert_called_once()
