@@ -1,3 +1,11 @@
+1.6.3 (2020-07-10)
+-------------------
+
+Fix data loss issue when running `LOG_BASED` due to the tap not sending new SCHEMA singer messages when source tables change structure, mainly new/renamed columns, which causes the target to not be up to date with the stream structure.
+The tap now:
+* Runs discovery for selected stream at the beginning of sync to send up to date SCHEMA singer messages
+* When new columns are detected in WAL payloads, then run discovery for the stream and send new SCHEMA message. 
+
 1.6.2 (2020-05-18)
 -------------------
 
