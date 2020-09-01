@@ -45,14 +45,14 @@ jobs:
           name: 'Pylinting'
           command: |
             . ./virtualenvs/tap-postgres/bin/activate
-            pylint --rcfile .pylintrc --disable duplicate-code tap_postgres/
+            make pylint
 
       - run:
           name: 'Tests'
           command: |
             . ./virtualenvs/tap-postgres/bin/activate
             export LOGGING_CONF_FILE=./sample_logging.conf
-            pytest --cov=tap_postgres tests
+            make test
 
 workflows:
   version: 2

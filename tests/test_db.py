@@ -38,3 +38,59 @@ class TestDbFunctions(unittest.TestCase):
         self.assertEqual(db.selected_value_to_singer_value_impl(True, 'boolean'), True)
         self.assertEqual(db.selected_value_to_singer_value_impl(0, 'boolean'), False)
         self.assertEqual(db.selected_value_to_singer_value_impl(False, 'boolean'), False)
+
+
+    def test_prepare_columns_sql(self):
+        self.assertEqual(' "my_column" ', db.prepare_columns_sql('my_column'))
+
+    def test_prepare_columns_for_select_sql_with_timestamp_ntz_column(self):
+        self.assertEqual(
+            'CASE WHEN  "my_column"  < \'0001-01-01 00:00:00.000000\' OR '
+            ' "my_column"  > \'9999-12-31 23:59:59.999999\' THEN \'9999-12-31 23:59:59.999999\' '
+            'ELSE  "my_column"  END AS  "my_column" ',
+            db.prepare_columns_for_select_sql('my_column',
+                                              {
+                                                  ('properties', 'my_column'):{
+                                                      'sql-datatype': 'timestamp without time zone'
+                                                  }
+                                              }
+                                              )
+        )
+
+    def test_prepare_columns_for_select_sql_with_timestamp_tz_column(self):
+        self.assertEqual(
+            'CASE WHEN  "my_column"  < \'0001-01-01 00:00:00.000000\' OR '
+            ' "my_column"  > \'9999-12-31 23:59:59.999999\' THEN \'9999-12-31 23:59:59.999999\' '
+            'ELSE  "my_column"  END AS  "my_column" ',
+            db.prepare_columns_for_select_sql('my_column',
+                                              {
+                                                  ('properties', 'my_column'):{
+                                                      'sql-datatype': 'timestamp with time zone'
+                                                  }
+                                              }
+                                              )
+        )
+
+    def test_prepare_columns_for_select_sql_with_not_timestamp_column(self):
+        self.assertEqual(
+            ' "my_column" ',
+            db.prepare_columns_for_select_sql('my_column',
+                                              {
+                                                  ('properties', 'my_column'):{
+                                                      'sql-datatype': 'int'
+                                                  }
+                                              }
+                                              )
+        )
+
+    def test_prepare_columns_for_select_sql_with_column_not_in_map(self):
+        self.assertEqual(
+            ' "my_column" ',
+            db.prepare_columns_for_select_sql('my_column',
+                                              {
+                                                  ('properties', 'nope'):{
+                                                      'sql-datatype': 'int'
+                                                  }
+                                              }
+                                              )
+        )
