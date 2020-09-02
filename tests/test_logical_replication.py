@@ -268,7 +268,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp without time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_out_of_range_2(self):
         """
@@ -279,7 +279,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp without time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_BC(self):
         """
@@ -290,7 +290,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp without time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_AC(self):
         """
@@ -301,7 +301,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp without time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_expect_iso_format(self):
         output = logical_replication.selected_value_to_singer_value_impl('2020-09-01 20:10:56+05',
@@ -327,7 +327,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp with time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_out_of_range_2(self):
         """
@@ -338,7 +338,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp with time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_BC(self):
         """
@@ -349,7 +349,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp with time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_AC(self):
         """
@@ -360,7 +360,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          'timestamp with time zone',
                                                                          None)
 
-        self.assertEqual('9999-12-31T23:59:59.999999+00:00', output)
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_row_to_singer_message(self):
         stream = {
@@ -412,12 +412,12 @@ class TestLogicalReplication(unittest.TestCase):
         self.assertEqual('my_schema-my_stream', output.stream)
         self.assertDictEqual({
             'c_timestamp_ntz_1': '2020-01-01T10:30:45+00:00',
-            'c_timestamp_ntz_2': '9999-12-31T23:59:59.999999+00:00',
-            'c_timestamp_ntz_3': '9999-12-31T23:59:59.999999+00:00',
+            'c_timestamp_ntz_2': '9999-12-31T23:59:59.999+00:00',
+            'c_timestamp_ntz_3': '9999-12-31T23:59:59.999+00:00',
             'c_timestamp_ntz_4': '2020-01-01T10:30:45+00:00',
             'c_timestamp_tz_1' : '2020-01-01T10:30:45-02:00',
-            'c_timestamp_tz_2' : '9999-12-31T23:59:59.999999+00:00',
-            'c_timestamp_tz_3' : '9999-12-31T23:59:59.999999+00:00',
+            'c_timestamp_tz_2' : '9999-12-31T23:59:59.999+00:00',
+            'c_timestamp_tz_3' : '9999-12-31T23:59:59.999+00:00',
             'c_timestamp_tz_4' : '2020-01-01T10:30:45+01:00',
         }, output.record)
 

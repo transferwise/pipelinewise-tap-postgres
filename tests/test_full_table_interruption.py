@@ -130,8 +130,8 @@ class LogicalInterruption(unittest.TestCase):
             'colour': 'brow',
             'id': 2,
             'name': 'smelly',
-            'timestamp_ntz': '9999-12-31T23:59:59.999999+00:00',
-            'timestamp_tz': '9999-12-31T23:59:59.999999+00:00'
+            'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
+            'timestamp_tz': '9999-12-31T23:59:59.999000+00:00'
         })
 
         self.assertEqual('public-COW', CAUGHT_MESSAGES[5].stream)
@@ -162,8 +162,8 @@ class LogicalInterruption(unittest.TestCase):
             'colour': 'brow',
             'id': 2,
             'name': 'smelly',
-            'timestamp_ntz': '9999-12-31T23:59:59.999999+00:00',
-            'timestamp_tz': '9999-12-31T23:59:59.999999+00:00'
+            'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
+            'timestamp_tz': '9999-12-31T23:59:59.999000+00:00'
         })
 
         self.assertEqual('public-COW', CAUGHT_MESSAGES[2].stream)
@@ -178,8 +178,8 @@ class LogicalInterruption(unittest.TestCase):
             'colour': 'green',
             'id': 3,
             'name': 'pooper',
-            'timestamp_ntz': '9999-12-31T23:59:59.999999+00:00',
-            'timestamp_tz': '9999-12-31T23:59:59.999999+00:00'
+            'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
+            'timestamp_tz': '9999-12-31T23:59:59.999000+00:00'
         })
         self.assertEqual('public-COW', CAUGHT_MESSAGES[4].stream)
 

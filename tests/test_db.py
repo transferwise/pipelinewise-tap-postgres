@@ -46,7 +46,7 @@ class TestDbFunctions(unittest.TestCase):
     def test_prepare_columns_for_select_sql_with_timestamp_ntz_column(self):
         self.assertEqual(
             'CASE WHEN  "my_column"  < \'0001-01-01 00:00:00.000000\' OR '
-            ' "my_column"  > \'9999-12-31 23:59:59.999999\' THEN \'9999-12-31 23:59:59.999999\' '
+            ' "my_column"  > \'9999-12-31 23:59:59.999999\' THEN \'9999-12-31 23:59:59.999\' '
             'ELSE  "my_column"  END AS  "my_column" ',
             db.prepare_columns_for_select_sql('my_column',
                                               {
@@ -60,7 +60,7 @@ class TestDbFunctions(unittest.TestCase):
     def test_prepare_columns_for_select_sql_with_timestamp_tz_column(self):
         self.assertEqual(
             'CASE WHEN  "my_column"  < \'0001-01-01 00:00:00.000000\' OR '
-            ' "my_column"  > \'9999-12-31 23:59:59.999999\' THEN \'9999-12-31 23:59:59.999999\' '
+            ' "my_column"  > \'9999-12-31 23:59:59.999999\' THEN \'9999-12-31 23:59:59.999\' '
             'ELSE  "my_column"  END AS  "my_column" ',
             db.prepare_columns_for_select_sql('my_column',
                                               {
