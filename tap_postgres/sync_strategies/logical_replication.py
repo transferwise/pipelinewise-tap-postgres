@@ -212,6 +212,11 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
         return elem
     if sql_datatype == 'timestamp without time zone':
         if isinstance(elem, datetime.datetime):
+            # we don't want a datetime like datetime(9999, 12, 31, 23, 59, 59, 999999) to be returned
+            # compare the date in UTC tz to the max allowed
+            if elem > datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                return FALLBACK_DATETIME
+
             return elem.isoformat() + '+00:00'
 
         with warnings.catch_warnings():
@@ -225,13 +230,27 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
             # parsing dates with era is not possible at moment
             # github.com/dateutil/dateutil/blob/c496b4f872b50e8845c0f46b585a1e3830ed3648/dateutil/parser/_parser.py#L297
             try:
-                return parse(elem).isoformat() + '+00:00'
+                parsed = parse(elem)
+
+                # compare the date in UTC tz to the max allowed
+                if parsed > datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                    return FALLBACK_DATETIME
+
+                return parsed.isoformat() + '+00:00'
             except (ParserError, UnknownTimezoneWarning):
                 return FALLBACK_DATETIME
 
     if sql_datatype == 'timestamp with time zone':
         if isinstance(elem, datetime.datetime):
-            return elem.isoformat()
+            try:
+                # compare the date in UTC tz to the max allowed
+                utc_datetime = elem.astimezone(pytz.UTC).replace(tzinfo=None)
+                if utc_datetime > datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                    return FALLBACK_DATETIME
+
+                return elem.isoformat()
+            except OverflowError:
+                return FALLBACK_DATETIME
 
         with warnings.catch_warnings():
             # we need to catch and handle this warning
@@ -244,8 +263,16 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
             # parsing dates with era is not possible at moment
             # github.com/dateutil/dateutil/blob/c496b4f872b50e8845c0f46b585a1e3830ed3648/dateutil/parser/_parser.py#L297
             try:
-                return parse(elem).isoformat()
-            except ParserError:
+                parsed = parse(elem)
+
+                # compare the date in UTC tz to the max allowed
+                if parsed.astimezone(pytz.UTC).replace(tzinfo=None) > \
+                        datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                    return FALLBACK_DATETIME
+
+                return parsed.isoformat()
+
+            except (ParserError, UnknownTimezoneWarning, OverflowError):
                 return FALLBACK_DATETIME
 
     if sql_datatype == 'date':

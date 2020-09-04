@@ -303,6 +303,34 @@ class TestLogicalReplication(unittest.TestCase):
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
+    def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_min(self):
+        output = logical_replication.selected_value_to_singer_value_impl('0001-01-01 00:00:00.000123',
+                                                                         'timestamp without time zone',
+                                                                         None)
+
+        self.assertEqual('0001-01-01T00:00:00.000123+00:00', output)
+
+    def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_max(self):
+        output = logical_replication.selected_value_to_singer_value_impl('9999-12-31 23:59:59.999999',
+                                                                         'timestamp without time zone',
+                                                                         None)
+
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
+
+    def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_datetime_min(self):
+        output = logical_replication.selected_value_to_singer_value_impl(datetime(1, 1, 1, 0, 0, 0, 123),
+                                                                         'timestamp without time zone',
+                                                                         None)
+
+        self.assertEqual('0001-01-01T00:00:00.000123+00:00', output)
+
+    def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_datetime_max(self):
+        output = logical_replication.selected_value_to_singer_value_impl(datetime(9999, 12, 31, 23, 59, 59, 999999),
+                                                                         'timestamp without time zone',
+                                                                         None)
+
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
+
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_expect_iso_format(self):
         output = logical_replication.selected_value_to_singer_value_impl('2020-09-01 20:10:56+05',
                                                                          'timestamp with time zone',
@@ -361,6 +389,37 @@ class TestLogicalReplication(unittest.TestCase):
                                                                          None)
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
+
+    def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_min(self):
+        output = logical_replication.selected_value_to_singer_value_impl('0001-01-01 00:00:00.000123+04',
+                                                                         'timestamp with time zone',
+                                                                         None)
+
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
+
+    def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_max(self):
+        output = logical_replication.selected_value_to_singer_value_impl('9999-12-31 23:59:59.999999-03',
+                                                                         'timestamp with time zone',
+                                                                         None)
+
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
+
+    def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_datetime_min(self):
+        output = logical_replication.selected_value_to_singer_value_impl(datetime(1, 1, 1, 0, 0, 0, 123,
+                                                                                  tzinfo=tzoffset(None, 14400)),
+                                                                         'timestamp with time zone',
+                                                                         None)
+
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
+
+    def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_datetime_max(self):
+        output = logical_replication.selected_value_to_singer_value_impl(datetime(9999, 12, 31, 23, 59, 59, 999999,
+                                                                                  tzinfo=tzoffset(None, -14400)),
+                                                                         'timestamp with time zone',
+                                                                         None)
+
+        self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
+
 
     def test_row_to_singer_message(self):
         stream = {
