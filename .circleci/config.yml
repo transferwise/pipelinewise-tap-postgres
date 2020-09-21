@@ -52,7 +52,7 @@ jobs:
           command: |
             . ./virtualenvs/tap-postgres/bin/activate
             export LOGGING_CONF_FILE=./sample_logging.conf
-            pytest --cov=tap_postgres tests
+            pytest --cov=tap_postgres  --cov-fail-under=59 tests -v
 
 workflows:
   version: 2

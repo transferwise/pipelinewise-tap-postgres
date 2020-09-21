@@ -1,5 +1,5 @@
 pylint:
-	pylint --rcfile .pylintrc tap_postgres
+	pylint --rcfile .pylintrc --disable duplicate-code tap_postgres/
 
 test:
-	pytest --cov=tap_postgres tests -v
+	pytest --cov=tap_postgres  --cov-fail-under=59 tests -v

@@ -6,11 +6,12 @@ import copy
 import json
 import re
 import singer
+import warnings
 import singer.metadata as metadata
 
 from psycopg2 import sql
 from singer import utils, get_bookmark
-from dateutil.parser import parse
+from dateutil.parser import parse, UnknownTimezoneWarning, ParserError
 from functools import reduce
 
 import tap_postgres.db as post_db
@@ -20,6 +21,7 @@ from tap_postgres.stream_utils import refresh_streams_schema
 LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
+FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 
 
 class ReplicationSlotNotFoundError(Exception):
@@ -210,12 +212,70 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
     if elem is None:
         return elem
     if sql_datatype == 'timestamp without time zone':
-        return parse(elem).isoformat() + '+00:00'
+        if isinstance(elem, datetime.datetime):
+            # we don't want a datetime like datetime(9999, 12, 31, 23, 59, 59, 999999) to be returned
+            # compare the date in UTC tz to the max allowed
+            if elem > datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                return FALLBACK_DATETIME
+
+            return elem.isoformat() + '+00:00'
+
+        with warnings.catch_warnings():
+            # we need to catch and handle this warning
+            # github.com/
+            #           dateutil/dateutil/blob/c496b4f872b50e8845c0f46b585a1e3830ed3648/dateutil/parser/_parser.py#L1213
+            # otherwise ad date like this '0001-12-31 23:40:28 BC' would be parsed as
+            # '0001-12-31T23:40:28+00:00' instead of using the fallback date
+            warnings.filterwarnings('error')
+
+            # parsing dates with era is not possible at moment
+            # github.com/dateutil/dateutil/blob/c496b4f872b50e8845c0f46b585a1e3830ed3648/dateutil/parser/_parser.py#L297
+            try:
+                parsed = parse(elem)
+
+                # compare the date in UTC tz to the max allowed
+                if parsed > datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                    return FALLBACK_DATETIME
+
+                return parsed.isoformat() + '+00:00'
+            except (ParserError, UnknownTimezoneWarning):
+                return FALLBACK_DATETIME
+
     if sql_datatype == 'timestamp with time zone':
         if isinstance(elem, datetime.datetime):
-            return elem.isoformat()
+            try:
+                # compare the date in UTC tz to the max allowed
+                utc_datetime = elem.astimezone(pytz.UTC).replace(tzinfo=None)
+                if utc_datetime > datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                    return FALLBACK_DATETIME
 
-        return parse(elem).isoformat()
+                return elem.isoformat()
+            except OverflowError:
+                return FALLBACK_DATETIME
+
+        with warnings.catch_warnings():
+            # we need to catch and handle this warning
+            # github.com/
+            #           dateutil/dateutil/blob/c496b4f872b50e8845c0f46b585a1e3830ed3648/dateutil/parser/_parser.py#L1213
+            # otherwise ad date like this '0001-12-31 23:40:28 BC' would be parsed as
+            # '0001-12-31T23:40:28+00:00' instead of using the fallback date
+            warnings.filterwarnings('error')
+
+            # parsing dates with era is not possible at moment
+            # github.com/dateutil/dateutil/blob/c496b4f872b50e8845c0f46b585a1e3830ed3648/dateutil/parser/_parser.py#L297
+            try:
+                parsed = parse(elem)
+
+                # compare the date in UTC tz to the max allowed
+                if parsed.astimezone(pytz.UTC).replace(tzinfo=None) > \
+                        datetime.datetime(9999, 12, 31, 23, 59, 59, 999000):
+                    return FALLBACK_DATETIME
+
+                return parsed.isoformat()
+
+            except (ParserError, UnknownTimezoneWarning, OverflowError):
+                return FALLBACK_DATETIME
+
     if sql_datatype == 'date':
         if isinstance(elem, datetime.date):
             # logical replication gives us dates as strings UNLESS they from an array
