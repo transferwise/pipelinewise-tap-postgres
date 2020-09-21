@@ -51,7 +51,10 @@ class LogicalInterruption(unittest.TestCase):
     def setUp(self):
         table_spec_1 = {"columns": [{"name": "id", "type" : "serial",       "primary_key" : True},
                                     {"name" : 'name', "type": "character varying"},
-                                    {"name" : 'colour', "type": "character varying"}],
+                                    {"name" : 'colour', "type": "character varying"},
+                                    {"name" : 'timestamp_ntz', "type": "timestamp without time zone"},
+                                    {"name" : 'timestamp_tz', "type": "timestamp with time zone"},
+                                    ],
                         "name" : 'COW'}
         ensure_test_table(table_spec_1)
         global COW_RECORD_COUNT
@@ -74,22 +77,24 @@ class LogicalInterruption(unittest.TestCase):
             conn.autocommit = True
             cur = conn.cursor()
 
-            cow_rec = {'name' : 'betty', 'colour' : 'blue'}
+            cow_rec = {'name' : 'betty', 'colour' : 'blue',
+                       'timestamp_ntz': '2020-09-01 10:40:59', 'timestamp_tz': '2020-09-01 00:50:59+02'}
             insert_record(cur, 'COW', cow_rec)
 
-            cow_rec = {'name' : 'smelly', 'colour' : 'brow'}
+            cow_rec = {'name' : 'smelly', 'colour' : 'brow',
+                       'timestamp_ntz': '2020-09-01 10:40:59 BC', 'timestamp_tz': '2020-09-01 00:50:59+02 BC'}
             insert_record(cur, 'COW', cow_rec)
 
-            cow_rec = {'name' : 'pooper', 'colour' : 'green'}
+            cow_rec = {'name' : 'pooper', 'colour' : 'green',
+                       'timestamp_ntz': '30000-09-01 10:40:59', 'timestamp_tz': '10000-09-01 00:50:59+02'}
             insert_record(cur, 'COW', cow_rec)
 
         state = {}
         #the initial phase of cows logical replication will be a full table.
         #it will sync the first record and then blow up on the 2nd record
         try:
-
             tap_postgres.do_sync(get_test_connection_config(), {'streams' : streams}, None, state)
-        except Exception as ex:
+        except Exception:
             blew_up_on_cow = True
 
         self.assertTrue(blew_up_on_cow)
@@ -97,30 +102,43 @@ class LogicalInterruption(unittest.TestCase):
         self.assertEqual(7, len(CAUGHT_MESSAGES))
 
         self.assertEqual(CAUGHT_MESSAGES[0]['type'], 'SCHEMA')
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[1], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[1], singer.StateMessage)
         self.assertIsNone(CAUGHT_MESSAGES[1].value['bookmarks']['public-COW'].get('xmin'))
         self.assertIsNotNone(CAUGHT_MESSAGES[1].value['bookmarks']['public-COW'].get('lsn'))
         end_lsn = CAUGHT_MESSAGES[1].value['bookmarks']['public-COW'].get('lsn')
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[2], singer.ActivateVersionMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[2], singer.ActivateVersionMessage)
         new_version = CAUGHT_MESSAGES[2].version
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[3], singer.RecordMessage))
-        self.assertEqual(CAUGHT_MESSAGES[3].record, {'colour': 'blue', 'id': 1, 'name': 'betty'})
+        self.assertIsInstance(CAUGHT_MESSAGES[3], singer.RecordMessage)
+        self.assertEqual(CAUGHT_MESSAGES[3].record, {
+            'colour': 'blue',
+            'id': 1,
+            'name': 'betty',
+            'timestamp_ntz': '2020-09-01T10:40:59+00:00',
+            'timestamp_tz': '2020-08-31T22:50:59+00:00'
+        })
+
         self.assertEqual('public-COW', CAUGHT_MESSAGES[3].stream)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[4], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[4], singer.StateMessage)
         #xmin is set while we are processing the full table replication
         self.assertIsNotNone(CAUGHT_MESSAGES[4].value['bookmarks']['public-COW']['xmin'])
         self.assertEqual(CAUGHT_MESSAGES[4].value['bookmarks']['public-COW']['lsn'], end_lsn)
 
-        self.assertEqual(CAUGHT_MESSAGES[5].record['name'], 'smelly')
+        self.assertEqual(CAUGHT_MESSAGES[5].record, {
+            'colour': 'brow',
+            'id': 2,
+            'name': 'smelly',
+            'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
+            'timestamp_tz': '9999-12-31T23:59:59.999000+00:00'
+        })
+
         self.assertEqual('public-COW', CAUGHT_MESSAGES[5].stream)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[6], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[6], singer.StateMessage)
         last_xmin = CAUGHT_MESSAGES[6].value['bookmarks']['public-COW']['xmin']
         old_state = CAUGHT_MESSAGES[6].value
-
 
         #run another do_sync, should get the remaining record which effectively finishes the initial full_table
         #replication portion of the logical replication
@@ -134,34 +152,47 @@ class LogicalInterruption(unittest.TestCase):
 
         self.assertEqual(CAUGHT_MESSAGES[0]['type'], 'SCHEMA')
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[1], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[1], singer.StateMessage)
         self.assertEqual(CAUGHT_MESSAGES[1].value['bookmarks']['public-COW'].get('xmin'), last_xmin)
         self.assertEqual(CAUGHT_MESSAGES[1].value['bookmarks']['public-COW'].get('lsn'), end_lsn)
         self.assertEqual(CAUGHT_MESSAGES[1].value['bookmarks']['public-COW'].get('version'), new_version)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[2], singer.RecordMessage))
-        self.assertEqual(CAUGHT_MESSAGES[2].record, {'colour': 'brow', 'id': 2, 'name': 'smelly'})
+        self.assertIsInstance(CAUGHT_MESSAGES[2], singer.RecordMessage)
+        self.assertEqual(CAUGHT_MESSAGES[2].record, {
+            'colour': 'brow',
+            'id': 2,
+            'name': 'smelly',
+            'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
+            'timestamp_tz': '9999-12-31T23:59:59.999000+00:00'
+        })
+
         self.assertEqual('public-COW', CAUGHT_MESSAGES[2].stream)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[3], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[3], singer.StateMessage)
         self.assertTrue(CAUGHT_MESSAGES[3].value['bookmarks']['public-COW'].get('xmin'),last_xmin)
         self.assertEqual(CAUGHT_MESSAGES[3].value['bookmarks']['public-COW'].get('lsn'), end_lsn)
         self.assertEqual(CAUGHT_MESSAGES[3].value['bookmarks']['public-COW'].get('version'), new_version)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[4], singer.RecordMessage))
-        self.assertEqual(CAUGHT_MESSAGES[4].record['name'], 'pooper')
+        self.assertIsInstance(CAUGHT_MESSAGES[4], singer.RecordMessage)
+        self.assertEqual(CAUGHT_MESSAGES[4].record, {
+            'colour': 'green',
+            'id': 3,
+            'name': 'pooper',
+            'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
+            'timestamp_tz': '9999-12-31T23:59:59.999000+00:00'
+        })
         self.assertEqual('public-COW', CAUGHT_MESSAGES[4].stream)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[5], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[5], singer.StateMessage)
         self.assertTrue(CAUGHT_MESSAGES[5].value['bookmarks']['public-COW'].get('xmin') > last_xmin)
         self.assertEqual(CAUGHT_MESSAGES[5].value['bookmarks']['public-COW'].get('lsn'), end_lsn)
         self.assertEqual(CAUGHT_MESSAGES[5].value['bookmarks']['public-COW'].get('version'), new_version)
 
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[6], singer.ActivateVersionMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[6], singer.ActivateVersionMessage)
         self.assertEqual(CAUGHT_MESSAGES[6].version, new_version)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[7], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[7], singer.StateMessage)
         self.assertIsNone(CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('xmin'))
         self.assertEqual(CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('lsn'), end_lsn)
         self.assertEqual(CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('version'), new_version)
@@ -230,23 +261,23 @@ class FullTableInterruption(unittest.TestCase):
         self.assertEqual(14, len(CAUGHT_MESSAGES))
 
         self.assertEqual(CAUGHT_MESSAGES[0]['type'], 'SCHEMA')
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[1], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[1], singer.StateMessage)
         self.assertIsNone(CAUGHT_MESSAGES[1].value['bookmarks']['public-CHICKEN'].get('xmin'))
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[2], singer.ActivateVersionMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[2], singer.ActivateVersionMessage)
         new_version = CAUGHT_MESSAGES[2].version
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[3], singer.RecordMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[3], singer.RecordMessage)
         self.assertEqual('public-CHICKEN', CAUGHT_MESSAGES[3].stream)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[4], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[4], singer.StateMessage)
         #xmin is set while we are processing the full table replication
         self.assertIsNotNone(CAUGHT_MESSAGES[4].value['bookmarks']['public-CHICKEN']['xmin'])
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[5], singer.ActivateVersionMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[5], singer.ActivateVersionMessage)
         self.assertEqual(CAUGHT_MESSAGES[5].version, new_version)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[6], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[6], singer.StateMessage)
         self.assertEqual(None, singer.get_currently_syncing( CAUGHT_MESSAGES[6].value))
         #xmin is cleared at the end of the full table replication
         self.assertIsNone(CAUGHT_MESSAGES[6].value['bookmarks']['public-CHICKEN']['xmin'])
@@ -256,18 +287,18 @@ class FullTableInterruption(unittest.TestCase):
         self.assertEqual(CAUGHT_MESSAGES[7]['type'], 'SCHEMA')
 
         self.assertEqual("public-COW", CAUGHT_MESSAGES[7]['stream'])
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[8], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[8], singer.StateMessage)
         self.assertIsNone(CAUGHT_MESSAGES[8].value['bookmarks']['public-COW'].get('xmin'))
         self.assertEqual("public-COW", CAUGHT_MESSAGES[8].value['currently_syncing'])
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[9], singer.ActivateVersionMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[9], singer.ActivateVersionMessage)
         cow_version = CAUGHT_MESSAGES[9].version
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[10], singer.RecordMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[10], singer.RecordMessage)
 
         self.assertEqual(CAUGHT_MESSAGES[10].record['name'], 'betty')
         self.assertEqual('public-COW', CAUGHT_MESSAGES[10].stream)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[11], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[11], singer.StateMessage)
         #xmin is set while we are processing the full table replication
         self.assertIsNotNone(CAUGHT_MESSAGES[11].value['bookmarks']['public-COW']['xmin'])
 
@@ -285,38 +316,38 @@ class FullTableInterruption(unittest.TestCase):
         tap_postgres.do_sync(get_test_connection_config(), {'streams' : streams}, None, old_state)
 
         self.assertEqual(CAUGHT_MESSAGES[0]['type'], 'SCHEMA')
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[1], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[1], singer.StateMessage)
 
         # because we were interrupted, we do not switch versions
         self.assertEqual(CAUGHT_MESSAGES[1].value['bookmarks']['public-COW']['version'], cow_version)
         self.assertIsNotNone(CAUGHT_MESSAGES[1].value['bookmarks']['public-COW']['xmin'])
         self.assertEqual("public-COW", singer.get_currently_syncing(CAUGHT_MESSAGES[1].value))
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[2], singer.RecordMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[2], singer.RecordMessage)
         self.assertEqual(CAUGHT_MESSAGES[2].record['name'], 'smelly')
         self.assertEqual('public-COW', CAUGHT_MESSAGES[2].stream)
 
 
         #after record: activate version, state with no xmin or currently syncing
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[3], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[3], singer.StateMessage)
         #we still have an xmin for COW because are not yet done with the COW table
         self.assertIsNotNone(CAUGHT_MESSAGES[3].value['bookmarks']['public-COW']['xmin'])
         self.assertEqual(singer.get_currently_syncing( CAUGHT_MESSAGES[3].value), 'public-COW')
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[4], singer.RecordMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[4], singer.RecordMessage)
         self.assertEqual(CAUGHT_MESSAGES[4].record['name'], 'pooper')
         self.assertEqual('public-COW', CAUGHT_MESSAGES[4].stream)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[5], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[5], singer.StateMessage)
         self.assertIsNotNone(CAUGHT_MESSAGES[5].value['bookmarks']['public-COW']['xmin'])
         self.assertEqual(singer.get_currently_syncing( CAUGHT_MESSAGES[5].value), 'public-COW')
 
 
         #xmin is cleared because we are finished the full table replication
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[6], singer.ActivateVersionMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[6], singer.ActivateVersionMessage)
         self.assertEqual(CAUGHT_MESSAGES[6].version, cow_version)
 
-        self.assertTrue(isinstance(CAUGHT_MESSAGES[7], singer.StateMessage))
+        self.assertIsInstance(CAUGHT_MESSAGES[7], singer.StateMessage)
         self.assertIsNone(singer.get_currently_syncing( CAUGHT_MESSAGES[7].value))
         self.assertIsNone(CAUGHT_MESSAGES[7].value['bookmarks']['public-CHICKEN']['xmin'])
         self.assertIsNone(singer.get_currently_syncing( CAUGHT_MESSAGES[7].value))

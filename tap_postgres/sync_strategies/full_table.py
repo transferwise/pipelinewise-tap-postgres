@@ -3,7 +3,10 @@ import time
 import psycopg2
 import psycopg2.extras
 import singer
+
+from functools import partial
 from singer import utils
+
 import singer.metrics as metrics
 import tap_postgres.db as post_db
 
@@ -91,7 +94,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
     schema_name = md_map.get(()).get('schema-name')
 
-    escaped_columns = map(post_db.prepare_columns_sql, desired_columns)
+    escaped_columns = map(partial(post_db.prepare_columns_for_select_sql, md_map=md_map), desired_columns)
 
     activate_version_message = singer.ActivateVersionMessage(
         stream=post_db.calculate_destination_stream_name(stream, md_map),
