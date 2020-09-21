@@ -1,3 +1,9 @@
+1.6.4 (2020-09-21)
+-------------------
+
+- Ensure generated Postgres replication slot name is valid
+- Handle timestamps out of range
+
 1.6.3 (2020-07-10)
 -------------------
 
