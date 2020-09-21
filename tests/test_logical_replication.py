@@ -100,13 +100,6 @@ class TestLogicalReplication(unittest.TestCase):
                                                                             'some.tap'),
                           'pipelinewise_some_db_some_tap')
 
-        # Replication slot name should be truncated to 64 characters
-        self.assertEqual(
-            logical_replication.generate_replication_slot_name('some_db_with_an_extremely_long_name',
-                                                               'some_tap_with_an_extremely_long_name'),
-             'pipelinewise_some_db_with_an_extremely_long_name_some_tap_with_a'
-        )
-
     def test_locate_replication_slot_by_cur(self):
         """Validate if both v15 and v16 style replication slot located correctly"""
         # Should return v15 style slot name if v15 style replication slot exists

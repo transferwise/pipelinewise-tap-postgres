@@ -418,8 +418,8 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
 
     slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
 
-    # Replace invalid characters and truncate to a maximum of 64 characters; required by Postgres
-    return re.sub('[^a-z0-9_]', '_', slot_name)[:64]
+    # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
+    return re.sub('[^a-z0-9_]', '_', slot_name)
 
 def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
     slot_name_v15 = generate_replication_slot_name(dbname)
