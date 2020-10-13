@@ -1,3 +1,8 @@
+1.7.1 (2020-10-13)
+-------------------
+
+- Parse data from json(b) when converting a row to a record message in log based replication method.
+
 1.7.0 (2020-09-21)
 -------------------
 
