@@ -39,7 +39,6 @@ class TestDbFunctions(unittest.TestCase):
         self.assertEqual(db.selected_value_to_singer_value_impl(0, 'boolean'), False)
         self.assertEqual(db.selected_value_to_singer_value_impl(False, 'boolean'), False)
 
-
     def test_prepare_columns_sql(self):
         self.assertEqual(' "my_column" ', db.prepare_columns_sql('my_column'))
 
@@ -50,7 +49,7 @@ class TestDbFunctions(unittest.TestCase):
             'ELSE  "my_column"  END AS  "my_column" ',
             db.prepare_columns_for_select_sql('my_column',
                                               {
-                                                  ('properties', 'my_column'):{
+                                                  ('properties', 'my_column'): {
                                                       'sql-datatype': 'timestamp without time zone'
                                                   }
                                               }
@@ -64,7 +63,7 @@ class TestDbFunctions(unittest.TestCase):
             'ELSE  "my_column"  END AS  "my_column" ',
             db.prepare_columns_for_select_sql('my_column',
                                               {
-                                                  ('properties', 'my_column'):{
+                                                  ('properties', 'my_column'): {
                                                       'sql-datatype': 'timestamp with time zone'
                                                   }
                                               }
@@ -76,7 +75,7 @@ class TestDbFunctions(unittest.TestCase):
             ' "my_column" ',
             db.prepare_columns_for_select_sql('my_column',
                                               {
-                                                  ('properties', 'my_column'):{
+                                                  ('properties', 'my_column'): {
                                                       'sql-datatype': 'int'
                                                   }
                                               }
@@ -88,9 +87,45 @@ class TestDbFunctions(unittest.TestCase):
             ' "my_column" ',
             db.prepare_columns_for_select_sql('my_column',
                                               {
-                                                  ('properties', 'nope'):{
+                                                  ('properties', 'nope'): {
                                                       'sql-datatype': 'int'
                                                   }
                                               }
                                               )
         )
+
+    def test_selected_value_to_singer_value_impl_with_null_json_returns_None(self):
+        output = db.selected_value_to_singer_value_impl(None, 'json')
+
+        self.assertEqual(None, output)
+
+    def test_selected_value_to_singer_value_impl_with_empty_json_returns_empty_dict(self):
+        output = db.selected_value_to_singer_value_impl('{}', 'json')
+
+        self.assertEqual({}, output)
+
+    def test_selected_value_to_singer_value_impl_with_non_empty_json_returns_equivalent_dict(self):
+        output = db.selected_value_to_singer_value_impl('{"key1": "A", "key2": [{"kk": "yo"}, {}]}', 'json')
+
+        self.assertEqual({
+            'key1': 'A',
+            'key2': [{'kk': 'yo'}, {}]
+        }, output)
+
+    def test_selected_value_to_singer_value_impl_with_null_jsonb_returns_None(self):
+        output = db.selected_value_to_singer_value_impl(None, 'jsonb')
+
+        self.assertEqual(None, output)
+
+    def test_selected_value_to_singer_value_impl_with_empty_jsonb_returns_empty_dict(self):
+        output = db.selected_value_to_singer_value_impl('{}', 'jsonb')
+
+        self.assertEqual({}, output)
+
+    def test_selected_value_to_singer_value_impl_with_non_empty_jsonb_returns_equivalent_dict(self):
+        output = db.selected_value_to_singer_value_impl('{"key1": "A", "key2": [{"kk": "yo"}, {}]}', 'jsonb')
+
+        self.assertEqual({
+            'key1': 'A',
+            'key2': [{'kk': 'yo'}, {}]
+        }, output)
