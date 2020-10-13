@@ -95,11 +95,11 @@ class TestLogicalReplication(unittest.TestCase):
         # Invalid characters should be replaced by underscores
         self.assertEqual(logical_replication.generate_replication_slot_name('some-db',
                                                                             'some-tap'),
-                          'pipelinewise_some_db_some_tap')
+                         'pipelinewise_some_db_some_tap')
 
         self.assertEqual(logical_replication.generate_replication_slot_name('some.db',
                                                                             'some.tap'),
-                          'pipelinewise_some_db_some_tap')
+                         'pipelinewise_some_db_some_tap')
 
     def test_locate_replication_slot_by_cur(self):
         """Validate if both v15 and v16 style replication slot located correctly"""
@@ -429,7 +429,6 @@ class TestLogicalReplication(unittest.TestCase):
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
-
     def test_row_to_singer_message(self):
         stream = {
             'stream': 'my_stream',
@@ -483,11 +482,59 @@ class TestLogicalReplication(unittest.TestCase):
             'c_timestamp_ntz_2': '9999-12-31T23:59:59.999+00:00',
             'c_timestamp_ntz_3': '9999-12-31T23:59:59.999+00:00',
             'c_timestamp_ntz_4': '2020-01-01T10:30:45+00:00',
-            'c_timestamp_tz_1' : '2020-01-01T10:30:45-02:00',
-            'c_timestamp_tz_2' : '9999-12-31T23:59:59.999+00:00',
-            'c_timestamp_tz_3' : '9999-12-31T23:59:59.999+00:00',
-            'c_timestamp_tz_4' : '2020-01-01T10:30:45+01:00',
+            'c_timestamp_tz_1': '2020-01-01T10:30:45-02:00',
+            'c_timestamp_tz_2': '9999-12-31T23:59:59.999+00:00',
+            'c_timestamp_tz_3': '9999-12-31T23:59:59.999+00:00',
+            'c_timestamp_tz_4': '2020-01-01T10:30:45+01:00',
         }, output.record)
 
         self.assertEqual(1000, output.version)
         self.assertEqual(datetime(2020, 9, 1, 10, 10, 10, tzinfo=tzoffset(None, 0)), output.time_extracted)
+
+    def test_selected_value_to_singer_value_impl_with_null_json_returns_None(self):
+        output = logical_replication.selected_value_to_singer_value_impl(None,
+                                                                         'json',
+                                                                         None)
+
+        self.assertEqual(None, output)
+
+    def test_selected_value_to_singer_value_impl_with_empty_json_returns_empty_dict(self):
+        output = logical_replication.selected_value_to_singer_value_impl('{}',
+                                                                         'json',
+                                                                         None)
+
+        self.assertEqual({}, output)
+
+    def test_selected_value_to_singer_value_impl_with_non_empty_json_returns_equivalent_dict(self):
+        output = logical_replication.selected_value_to_singer_value_impl('{"key1": "A", "key2": [{"kk": "yo"}, {}]}',
+                                                                         'json',
+                                                                         None)
+
+        self.assertEqual({
+            'key1': 'A',
+            'key2': [{'kk': 'yo'}, {}]
+        }, output)
+
+    def test_selected_value_to_singer_value_impl_with_null_jsonb_returns_None(self):
+        output = logical_replication.selected_value_to_singer_value_impl(None,
+                                                                         'jsonb',
+                                                                         None)
+
+        self.assertEqual(None, output)
+
+    def test_selected_value_to_singer_value_impl_with_empty_jsonb_returns_empty_dict(self):
+        output = logical_replication.selected_value_to_singer_value_impl('{}',
+                                                                         'jsonb',
+                                                                         None)
+
+        self.assertEqual({}, output)
+
+    def test_selected_value_to_singer_value_impl_with_non_empty_jsonb_returns_equivalent_dict(self):
+        output = logical_replication.selected_value_to_singer_value_impl('{"key1": "A", "key2": [{"kk": "yo"}, {}]}',
+                                                                         'jsonb',
+                                                                         None)
+
+        self.assertEqual({
+            'key1': 'A',
+            'key2': [{'kk': 'yo'}, {}]
+        }, output)

@@ -211,6 +211,13 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
 
     if elem is None:
         return elem
+
+    if sql_datatype == 'money':
+        return elem
+
+    if sql_datatype in ['json', 'jsonb']:
+        return json.loads(elem)
+
     if sql_datatype == 'timestamp without time zone':
         if isinstance(elem, datetime.datetime):
             # we don't want a datetime like datetime(9999, 12, 31, 23, 59, 59, 999999) to be returned
