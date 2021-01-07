@@ -49,6 +49,9 @@ def open_connection(conn_config, logical_replication=False):
         'connect_timeout': 30
     }
 
+    if conn_config.get('statement_timeout'):
+        cfg['options'] = '-c statement_timeout={}'.format(conn_config['statement_timeout'])
+
     if conn_config.get('sslmode'):
         cfg['sslmode'] = conn_config['sslmode']
 
