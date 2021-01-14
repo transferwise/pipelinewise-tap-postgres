@@ -100,7 +100,7 @@ Each entry under the Catalog's "stream" key will need the following metadata:
 
 The replication method can be one of `FULL_TABLE`, `INCREMENTAL` or `LOG_BASED`.
 
-**Note**: Log based replication requires some adjustments in the source postgres database, please read further
+**Note**: Log based replication requires a few adjustments in the source postgres database, please read further
 for more information.
 
 ### Run the tap in Sync Mode
