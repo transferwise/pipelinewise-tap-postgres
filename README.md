@@ -183,7 +183,7 @@ Test objects will be created in the `postgres` database.
 
 3. To run the tests:
 ```
-  make tests
+  make test
 ```
 
 ### To run pylint:
