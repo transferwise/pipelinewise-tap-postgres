@@ -37,8 +37,6 @@ or
   pip install .
 ```
 
-### Configuration
-
 ### Create a config.json
 
 ```
@@ -163,7 +161,7 @@ to the tap for the next sync.
   **Note**: Replication slots are specific to a given database in a cluster. If you want to connect multiple
   databases - whether in one integration or several - you’ll need to create a replication slot for each database.
 
-## To run tests:
+### To run tests:
 
 1. Install python test dependencies in a virtual env and run nose unit and integration tests
 ```
@@ -185,7 +183,7 @@ Test objects will be created in the `postgres` database.
 
 3. To run the tests:
 ```
-  pytest tests
+  make tests
 ```
 
 ### To run pylint:
@@ -197,8 +195,7 @@ Test objects will be created in the `postgres` database.
   pip install --upgrade pip
   pip install .
   pip install pylint
-  pylint tap_postgres
+  make pylint
 ```
 
 ---
-
