@@ -193,8 +193,7 @@ Test objects will be created in the `postgres` database.
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
-  pip install .
-  pip install pylint
+  pip install .[test]
   make pylint
 ```
 
