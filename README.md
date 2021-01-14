@@ -67,7 +67,7 @@ Full list of options in `config.json`:
 | logical_poll_seconds                | Integer | No         | Stop running the tap when no data received from wal after certain number of seconds. (Default: 10800) |
 | break_at_end_lsn                    | Boolean | No         | Stop running the tap if the newly received lsn is after the max lsn that was detected when the tap started. (Default: true) |
 | max_run_seconds                     | Integer | No         | Stop running the tap after certain number of seconds. (Default: 43200) |
-| debug_lsn                           | String  | No         | Add `_sdc_lsn` property to the singer messages to debug postgres LSN position in the WAL stream. (Default: False) |
+| debug_lsn                           | String  | No         | If set to `"true"` then add `_sdc_lsn` property to the singer messages to debug postgres LSN position in the WAL stream. (Default: None) |
 
 
 ### Run the tap in Discovery Mode
