@@ -592,7 +592,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                               })
 
     except psycopg2.ProgrammingError as ex:
-        raise Exception("Unable to start replication with logical replication (slot {})".format(ex))
+        raise Exception("Unable to start replication with logical replication (slot {})".format(ex)) from ex
 
     lsn_received_timestamp = datetime.datetime.utcnow()
     poll_timestamp = datetime.datetime.utcnow()
