@@ -163,7 +163,7 @@ to the tap for the next sync.
 
 ### To run tests:
 
-1. Install python test dependencies in a virtual env and run nose unit and integration tests
+1. Install python test dependencies in a virtual env:
 ```
   python3 -m venv venv
   . venv/bin/activate
