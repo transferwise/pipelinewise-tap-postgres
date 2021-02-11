@@ -83,7 +83,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                 if replication_key_value:
                     select_sql = """SELECT {}
                                     FROM {}
-                                    WHERE {} >= '{}'::{}
+                                    WHERE {} > '{}'::{}
                                     ORDER BY {} ASC""".format(','.join(escaped_columns),
                                                               post_db.fully_qualified_table_name(schema_name,
                                                                                                  stream['table_name']),
