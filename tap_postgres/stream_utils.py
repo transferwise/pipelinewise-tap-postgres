@@ -90,6 +90,12 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
                 if not metadatum['breadcrumb']:
                     meta.update(new_discovery[stream['tap_stream_id']]['metadata'][idx_met]['metadata'])
                     new_discovery[stream['tap_stream_id']]['metadata'][idx_met]['metadata'] = meta
+                elif metadatum['breadcrumb'] in md_map:
+                    # takes discoverable node's metadata from new_discover
+                    # and keeps remaining metadata from the original node (like 'selected')
+                    node_md_map = md_map.get(metadatum['breadcrumb'])
+                    node_md_map.update(metadatum['metadata'])
+                    new_discovery[stream['tap_stream_id']]['metadata'][idx_met]['metadata'] = node_md_map
 
             # 2nd step: now copy all the metadata from the updated new discovery to the original stream
             streams[idx]['metadata'] = copy.deepcopy(new_discovery[stream['tap_stream_id']]['metadata'])
