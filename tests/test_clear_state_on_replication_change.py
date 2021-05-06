@@ -67,6 +67,46 @@ class TestClearState(unittest.TestCase):
         nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, None, 'FULL_TABLE')
         self.assertEqual(nascent_state, {'bookmarks' : {tap_stream_id : { "last_replication_method" : "FULL_TABLE"}}})
 
+    # time-based tests
+    def test_time_based_happy(self):
+        state = {'bookmarks' : {tap_stream_id : { 'version' : 1, "replication_key" : 'updated_at', 'replication_key_value' : '2017-01-01T00:00:03+00:00', 'last_replication_method' : 'TIME_BASED'}}}
+        nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, 'updated_at', 'TIME_BASED')
+        self.assertEqual(nascent_state, state)
+
+    def test_time_based_changing_replication_keys(self):
+        state = {'bookmarks' : {tap_stream_id : { 'version' : 1, "replication_key" : 'updated_at', 'replication_key_value' : '2017-01-01T00:00:03+00:00', 'last_replication_method' : 'TIME_BASED'}}}
+
+        nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, 'updated_at_2', 'TIME_BASED')
+        self.assertEqual(nascent_state, {'bookmarks' : {tap_stream_id : {'last_replication_method' : 'TIME_BASED'}}})
+
+    def test_time_based_changing_replication_key_interrupted(self):
+        xmin = '3737373'
+        state = {'bookmarks' : {tap_stream_id : { 'version' : 1, 'xmin' : xmin, "replication_key" : 'updated_at', 'replication_key_value' : '2017-01-01T00:00:03+00:00',
+                                                  'last_replication_method' : 'TIME_BASED'}}}
+        nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, 'updated_at_2', 'TIME_BASED')
+        self.assertEqual(nascent_state, {'bookmarks' : {tap_stream_id : { 'last_replication_method' : 'TIME_BASED'}}})
+
+    def test_full_table_to_time_based(self):
+        #interrupted full table -> time_based
+        xmin = '3737373'
+        state = {'bookmarks' : {tap_stream_id : { 'version' : 1, 'xmin' : xmin, "last_replication_method" : "FULL_TABLE"}}}
+
+        nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, 'updated_at', 'TIME_BASED')
+        self.assertEqual(nascent_state, {'bookmarks' : {tap_stream_id : {"last_replication_method" : "TIME_BASED"}}})
+
+        state = {'bookmarks' : {tap_stream_id : { 'version' : 1, "last_replication_method" : "FULL_TABLE"}}}
+        nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, 'updated_at', 'TIME_BASED')
+        self.assertEqual(nascent_state, {'bookmarks' : {tap_stream_id : {"last_replication_method" : "TIME_BASED"}}})
+
+
+    def test_log_based_to_time_based(self):
+        state = {'bookmarks' : {tap_stream_id : { 'version' : 1, 'lsn' : 34343434, "last_replication_method" : "LOG_BASED"}}}
+        nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, 'updated_at', 'TIME_BASED')
+        self.assertEqual(nascent_state, {'bookmarks' : {tap_stream_id : {"last_replication_method" : "TIME_BASED"}}})
+
+        state = {'bookmarks' : {tap_stream_id : { 'version' : 1, 'lsn' : 34343434, 'xmin' : 34343, "last_replication_method" : "LOG_BASED"}}}
+        nascent_state = tap_postgres.clear_state_on_replication_change(state, tap_stream_id, 'updated_at', 'TIME_BASED')
+        self.assertEqual(nascent_state, {'bookmarks' : {tap_stream_id : {"last_replication_method" : "TIME_BASED"}}})
 
     #log based tests
     def test_log_based_happy(self):

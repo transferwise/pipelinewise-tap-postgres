@@ -47,7 +47,7 @@ def clear_state_on_replication_change(state: Dict,
         state = singer.reset_stream(state, tap_stream_id)
 
     # key changed
-    if replication_method == 'INCREMENTAL' and \
+    if replication_method in ('INCREMENTAL', 'TIME_BASED') and \
             replication_key != singer.get_bookmark(state, tap_stream_id, 'replication_key'):
         state = singer.reset_stream(state, tap_stream_id)
 

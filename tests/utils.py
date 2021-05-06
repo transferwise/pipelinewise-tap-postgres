@@ -87,12 +87,17 @@ def unselect_column(our_stream, col):
     return our_stream
 
 def set_replication_method_for_stream(stream, method):
-    new_md = metadata.to_map(stream['metadata'])
-    old_md = new_md.get(())
-    old_md.update({'replication-method': method})
-
-    stream['metadata'] = metadata.to_list(new_md)
+    stream_md = metadata.to_map(stream['metadata'])
+    table_md = stream_md.get(())
+    table_md.update({'replication-method': method})  # This modifies the table metadata entry in stream_md
+    stream['metadata'] = metadata.to_list(stream_md)
     return stream
+
+def set_time_based_replication_metadata_for_stream(stream, replication_key, replication_time_interval):
+    stream_md = metadata.to_map(stream['metadata'])
+    table_md = stream_md.get(())
+    table_md.update({'replication-method': 'TIME_BASED', 'replication-key': replication_key, 'replication-time-interval': replication_time_interval})  # This modifies the table metadata entry in stream_md
+    stream['metadata'] = metadata.to_list(stream_md)
 
 def select_all_of_stream(stream):
     new_md = metadata.to_map(stream['metadata'])
