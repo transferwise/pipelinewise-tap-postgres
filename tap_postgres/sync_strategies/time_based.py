@@ -1,5 +1,6 @@
 import copy
 import time
+import dateutil.parser
 import psycopg2
 import psycopg2.extras
 import singer
@@ -52,7 +53,12 @@ def fetch_next_replication_key(conn_config, replication_key_value, replication_k
             LOGGER.info("next replication key value: %s", next_key)
             return next_key
 
-
+def fetch_bookmark_replication_key_value(state, stream):
+    bookmark = singer.get_bookmark(state, stream['tap_stream_id'], 'replication_key_value')
+    if bookmark:
+        return dateutil.parser.parse(bookmark)
+    else:
+        return None
 
 # pylint: disable=too-many-locals
 def sync_table(conn_info, stream, state, desired_columns, md_map):
@@ -80,7 +86,10 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     singer.write_message(activate_version_message)
 
     replication_key = md_map.get((), {}).get('replication-key')
-    replication_key_value = singer.get_bookmark(state, stream['tap_stream_id'], 'replication_key_value') or fetch_min_replication_key(conn_info, replication_key, schema_name, stream['table_name'] )  # TODO:  Change to get min replication key value
+
+    replication_key_value = fetch_bookmark_replication_key_value(state, stream) or \
+                            fetch_min_replication_key(conn_info, replication_key, schema_name, stream['table_name'] )
+
     replication_time_interval = md_map.get((), {}).get('replication-time-interval')
     replication_key_sql_datatype = md_map.get(('properties', replication_key)).get('sql-datatype')
 
