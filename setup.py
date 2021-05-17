@@ -25,7 +25,7 @@ setup(name='pipelinewise-tap-postgres',
           "test": [
               'pytest==6.2.1',
               'pylint==2.6.0',
-              'pytest-cov==2.10.1'
+              'pytest-cov==2.12.0'
           ]
       },
       entry_points='''
