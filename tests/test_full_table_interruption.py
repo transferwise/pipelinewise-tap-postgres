@@ -99,7 +99,7 @@ class LogicalInterruption(unittest.TestCase):
 
         self.assertTrue(blew_up_on_cow)
 
-        self.assertEqual(7, len(CAUGHT_MESSAGES))
+        self.assertEqual(7, len(CAUGHT_MESSAGES), "Number of Caught Messages")
 
         self.assertEqual(CAUGHT_MESSAGES[0]['type'], 'SCHEMA')
         self.assertIsInstance(CAUGHT_MESSAGES[1], singer.StateMessage)
