@@ -8,16 +8,12 @@ on:
       - main
 
 jobs:
-  build:
-    name: build
+  lint_and_test:
+    name: Linting and Testing
     runs-on: ubuntu-latest
-    container:
-      image: circleci/python:3.6.2
-      env:
-        TAP_POSTGRES_PORT: 5432
-        TAP_POSTGRES_USER: test_user
-        TAP_POSTGRES_PASSWORD: my-secret-passwd
-        TAP_POSTGRES_HOST: test_postgres
+    strategy:
+      matrix:
+        python-version: [ 3.6, 3.7, 3.8 ]
 
     services:
       test_postgres:
@@ -31,6 +27,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - name: Set up Python ${{ matrix.container[1] }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Setup virtual environment
         run: make venv
 
@@ -39,5 +40,9 @@ jobs:
 
       - name: Tests
         env:
+          TAP_POSTGRES_PORT: 5432
+          TAP_POSTGRES_USER: test_user
+          TAP_POSTGRES_PASSWORD: my-secret-passwd
+          TAP_POSTGRES_HOST: test_postgres
           LOGGING_CONF_FILE: ./sample_logging.conf
         run: make test
