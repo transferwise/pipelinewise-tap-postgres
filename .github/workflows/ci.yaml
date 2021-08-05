@@ -22,6 +22,8 @@ jobs:
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: my-secret-passwd
           POSTGRES_DB: tap_postgres_test
+        ports:
+          - 5432:5432
 
     steps:
       - name: Checkout repository
@@ -43,6 +45,6 @@ jobs:
           TAP_POSTGRES_PORT: 5432
           TAP_POSTGRES_USER: test_user
           TAP_POSTGRES_PASSWORD: my-secret-passwd
-          TAP_POSTGRES_HOST: localhost
+          TAP_POSTGRES_HOST: test_postgres
           LOGGING_CONF_FILE: ./sample_logging.conf
         run: make test
