@@ -56,7 +56,7 @@ def do_sync_full_table(conn_config, stream, state, desired_columns, md_map):
     """
     LOGGER.info("Stream %s is using full_table replication", stream['tap_stream_id'])
     sync_common.send_schema_message(stream, [])
-    attemp = 0
+    attempt = 0
     while True:
         try:
             if md_map.get((), {}).get('is-view'):
@@ -66,10 +66,10 @@ def do_sync_full_table(conn_config, stream, state, desired_columns, md_map):
             return state
         except Exception as e:
             LOGGER.warn("error on read for a stream: %s. Message: %s", stream['tap_stream_id'], e)
-            if attemp > post_db.TRY_NUMBER:
+            if attempt > post_db.TRY_NUMBER:
                 raise e
             else:
-                attemp = attemp + 1
+                attempt = attempt + 1
 
 
 # Possible state keys: replication_key, replication_key_value, version
