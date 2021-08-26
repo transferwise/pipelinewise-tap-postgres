@@ -6,8 +6,8 @@ import singer
 
 from singer import utils
 from functools import partial
+from singer import metrics
 
-import singer.metrics as metrics
 import tap_postgres.db as post_db
 
 
