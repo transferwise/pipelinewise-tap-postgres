@@ -10,11 +10,12 @@ import singer.schema
 from singer import utils, metadata, get_bookmark
 from singer.catalog import Catalog
 
-import tap_postgres.sync_strategies.logical_replication as logical_replication
-import tap_postgres.sync_strategies.full_table as full_table
-import tap_postgres.sync_strategies.incremental as incremental
 import tap_postgres.db as post_db
 import tap_postgres.sync_strategies.common as sync_common
+
+from tap_postgres.sync_strategies import logical_replication
+from tap_postgres.sync_strategies import full_table
+from tap_postgres.sync_strategies import incremental
 from tap_postgres.discovery_utils import discover_db
 from tap_postgres.stream_utils import (
     dump_catalog, clear_state_on_replication_change,
