@@ -8,9 +8,8 @@ import re
 import singer
 import warnings
 
-from singer import metadata
 from psycopg2 import sql
-from singer import utils, get_bookmark
+from singer import metadata, utils, get_bookmark
 from dateutil.parser import parse, UnknownTimezoneWarning, ParserError
 from functools import reduce
 
