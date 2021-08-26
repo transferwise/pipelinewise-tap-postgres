@@ -7,8 +7,8 @@ import json
 import re
 import singer
 import warnings
-import singer.metadata as metadata
 
+from singer import metadata
 from psycopg2 import sql
 from singer import utils, get_bookmark
 from dateutil.parser import parse, UnknownTimezoneWarning, ParserError
@@ -660,8 +660,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             else:
                 LOGGER.info('Lastest wal message received was %s', int_to_lsn(lsn_last_processed))
                 try:
-                    state_comitted_file = open(state_file)
-                    state_comitted = json.load(state_comitted_file)
+                    with open(state_file, mode="r", encoding="utf-8") as fh:
+                        state_comitted = json.load(fh)
                 except Exception:
                     LOGGER.debug('Unable to open and parse %s', state_file)
                 finally:
