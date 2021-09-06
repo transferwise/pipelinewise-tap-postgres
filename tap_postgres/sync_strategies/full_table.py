@@ -6,8 +6,8 @@ import singer
 
 from functools import partial
 from singer import utils
+from singer import metrics
 
-import singer.metrics as metrics
 import tap_postgres.db as post_db
 
 LOGGER = singer.get_logger('tap_postgres')
