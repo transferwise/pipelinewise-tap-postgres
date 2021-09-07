@@ -432,7 +432,7 @@ class TestLogicalReplication(unittest.TestCase):
     def test_selected_value_to_singer_value_impl_with_date_value_as_string_expect_iso_format(self):
         output = logical_replication.selected_value_to_singer_value_impl('2021-09-07', 'date', None)
 
-        self.assertEqual('2021-09-07T00:00:00.000+00:00', output)
+        self.assertEqual('2021-09-07T00:00:00+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_date_value_as_string_out_of_range(self):
         """
@@ -442,7 +442,7 @@ class TestLogicalReplication(unittest.TestCase):
         """
         output = logical_replication.selected_value_to_singer_value_impl('10000-09-01', 'date', None)
 
-        self.assertEqual('9999-12-31T00:00:00.000+00:00', output)
+        self.assertEqual('9999-12-31T00:00:00+00:00', output)
 
     def test_row_to_singer_message(self):
         stream = {
