@@ -62,12 +62,14 @@ def open_connection(conn_config, logical_replication=False):
 def prepare_columns_for_select_sql(c, md_map):
     column_name = ' "{}" '.format(canonicalize_identifier(c))
 
-    if ('properties', c) in md_map and md_map[('properties', c)]['sql-datatype'].startswith('timestamp'):
-        return f'CASE ' \
-               f'WHEN {column_name} < \'0001-01-01 00:00:00.000\' ' \
-               f'OR {column_name} > \'9999-12-31 23:59:59.999\' THEN \'9999-12-31 23:59:59.999\' ' \
-               f'ELSE {column_name} ' \
-               f'END AS {column_name}'
+    if ('properties', c) in md_map:
+        sql_datatype = md_map[('properties', c)]['sql-datatype']
+        if sql_datatype.startswith('timestamp') and not sql_datatype.endswith('[]'):
+            return f'CASE ' \
+                   f'WHEN {column_name} < \'0001-01-01 00:00:00.000\' ' \
+                   f'OR {column_name} > \'9999-12-31 23:59:59.999\' THEN \'9999-12-31 23:59:59.999\' ' \
+                   f'ELSE {column_name} ' \
+                   f'END AS {column_name}'
     return column_name
 
 def prepare_columns_sql(c):
