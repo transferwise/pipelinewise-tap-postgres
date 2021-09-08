@@ -70,6 +70,30 @@ class TestDbFunctions(unittest.TestCase):
                                               )
         )
 
+    def test_prepare_columns_for_select_sql_with_timestamp_ntz_array_column(self):
+        self.assertEqual(
+            ' "my_column" ',
+            db.prepare_columns_for_select_sql('my_column',
+                                              {
+                                                  ('properties', 'my_column'): {
+                                                      'sql-datatype': 'timestamp without time zone[]'
+                                                  }
+                                              }
+                                              )
+        )
+
+    def test_prepare_columns_for_select_sql_with_timestamp_tz_array_column(self):
+        self.assertEqual(
+            ' "my_column" ',
+            db.prepare_columns_for_select_sql('my_column',
+                                              {
+                                                  ('properties', 'my_column'): {
+                                                      'sql-datatype': 'timestamp with time zone[]'
+                                                  }
+                                              }
+                                              )
+        )
+
     def test_prepare_columns_for_select_sql_with_not_timestamp_column(self):
         self.assertEqual(
             ' "my_column" ',
