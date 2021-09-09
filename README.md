@@ -179,6 +179,14 @@ to the tap for the next sync.
   export TAP_POSTGRES_PASSWORD=<postgres-password>
 ```
 
+Alternatively, run `docker-compose --file docker-compose-postgres.yml up` to run postgres in a Docker container. The environment variables will be:
+```
+  export TAP_POSTGRES_HOST="127.0.0.1"
+  export TAP_POSTGRES_PORT="5432"
+  export TAP_POSTGRES_USER="dbuser"
+  export TAP_POSTGRES_PASSWORD="admin2021"
+```
+
 Test objects will be created in the `postgres` database.
 
 3. To run the tests:
