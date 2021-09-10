@@ -15,6 +15,9 @@ LOGGER = singer.get_logger('tap_postgres')
 
 CURSOR_ITER_SIZE = 20000
 
+TRANSACTIONAL_CONNECTION = None
+LOGICAL_CONNECTION = None
+
 
 # pylint: disable=invalid-name,missing-function-docstring
 def calculate_destination_stream_name(stream, md_map):
@@ -53,11 +56,33 @@ def open_connection(conn_config, logical_replication=False):
         cfg['sslmode'] = conn_config['sslmode']
 
     if logical_replication:
-        cfg['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
+        return open_logical_connection(cfg)
 
-    conn = psycopg2.connect(**cfg)
+    return open_transactional_connection(cfg)
 
-    return conn
+
+# pylint: disable=global-statement
+def open_transactional_connection(conn_config):
+    global TRANSACTIONAL_CONNECTION
+
+    if TRANSACTIONAL_CONNECTION is None or TRANSACTIONAL_CONNECTION.closed:
+        LOGGER.info("OPENING TRANSACTIONAL CONNECTION")
+        TRANSACTIONAL_CONNECTION = psycopg2.connect(**conn_config)
+
+    return TRANSACTIONAL_CONNECTION
+
+
+# pylint: disable=global-statement
+def open_logical_connection(conn_config):
+    global LOGICAL_CONNECTION
+
+    conn_config['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
+
+    if LOGICAL_CONNECTION is None or LOGICAL_CONNECTION.closed:
+        LOGGER.info("OPENING LOGICAL CONNECTION")
+        LOGICAL_CONNECTION = psycopg2.connect(**conn_config)
+
+    return LOGICAL_CONNECTION
 
 def prepare_columns_for_select_sql(c, md_map):
     column_name = ' "{}" '.format(canonicalize_identifier(c))
