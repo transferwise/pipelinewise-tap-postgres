@@ -6,11 +6,11 @@ with open('README.md') as f:
     long_description = f.read()
 
 setup(name='pipelinewise-tap-postgres',
-      version='1.8.0',
+      version='1.8.1',
       description='Singer.io tap for extracting data from PostgresSQL - PipelineWise compatible',
       long_description=long_description,
       long_description_content_type='text/markdown',
-      author='TransferWise',
+      author='Wise',
       url='https://github.com/transferwise/pipelinewise-tap-postgres',
       classifiers=[
           'License :: OSI Approved :: GNU Affero General Public License v3',
@@ -25,7 +25,7 @@ setup(name='pipelinewise-tap-postgres',
           "test": [
               'pytest==6.2.5',
               'pylint==2.10.2',
-              'pytest-cov==2.10.1'
+              'pytest-cov==2.12.1'
           ]
       },
       entry_points='''
@@ -33,4 +33,4 @@ setup(name='pipelinewise-tap-postgres',
           tap-postgres=tap_postgres:main
       ''',
       packages=['tap_postgres', 'tap_postgres.sync_strategies']
-)
+      )

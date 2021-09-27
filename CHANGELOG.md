@@ -1,3 +1,9 @@
+1.8.1 (2021-09-23)
+-------------------
+**Fixes**
+- LOG_BASED: Handle dates with year > 9999.
+- INCREMENTAL & FULL_TABLE: Avoid processing timestamps arrays as timestamp
+
 1.8.0 (2021-06-23)
 -------------------
 
