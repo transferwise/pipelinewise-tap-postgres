@@ -29,7 +29,8 @@ class TestInit(unittest.TestCase):
                                   {"name": '"character-varying_name"', "type": "character varying"},
                                   {"name": '"varchar-name"', "type": "varchar(28)"},
                                   {"name": 'char_name', "type": "char(10)"},
-                                  {"name": '"text-name"', "type": "text"}],
+                                  {"name": '"text-name"', "type": "text"},
+                                  {"name": "json_name", "type": "jsonb"}],
                       "name": self.table_name}
 
         ensure_test_table(table_spec)
@@ -42,7 +43,7 @@ class TestInit(unittest.TestCase):
                 'table_name': self.table_name,
                 'stream': self.table_name,
                 'tap_stream_id': f'public-{self.table_name}',
-                'schema': [],
+                'schema': {'properties': {'json_name': {'type': ['null', 'string']}}},
                 'metadata': [
                     {
                         'breadcrumb': [],
@@ -50,6 +51,12 @@ class TestInit(unittest.TestCase):
                             'replication-method': 'LOG_BASED',
                             'table-key-properties': ['some_id'],
                             'row-count': 1000,
+                        }
+                    },
+                    {
+                        'breadcrumb': ['properties', 'char_name'],
+                        'metadata': {
+                            'arbitrary_field_metadata': 'should be preserved'
                         }
                     }
                 ]
@@ -86,7 +93,11 @@ class TestInit(unittest.TestCase):
                                           'selected-by-default': True},
             ('properties', 'char_name'): {'selected-by-default': True,
                                           'inclusion': 'available',
-                                          'sql-datatype': 'character'}})
+                                          'sql-datatype': 'character',
+                                          'arbitrary_field_metadata': 'should be preserved'},
+            ('properties', 'json_name'): {'selected-by-default': True,
+                                          'inclusion': 'available',
+                                          'sql-datatype': 'jsonb'}})
 
         self.assertEqual({'properties': {'id': {'type': ['integer'],
                                                 'maximum': 2147483647,
@@ -94,6 +105,7 @@ class TestInit(unittest.TestCase):
                                          'character-varying_name': {'type': ['null', 'string']},
                                          'varchar-name': {'type': ['null', 'string'], 'maxLength': 28},
                                          'char_name': {'type': ['null', 'string'], 'maxLength': 10},
-                                         'text-name': {'type': ['null', 'string']}},
+                                         'text-name': {'type': ['null', 'string']},
+                                         'json_name': {'type': ['null', 'string']}},
                           'type': 'object',
                           'definitions': BASE_RECURSIVE_SCHEMAS}, streams[0].get('schema'))
