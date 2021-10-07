@@ -93,7 +93,7 @@ def _merge_stream_schema(stream, discovered_stream):
     for column, column_schema in stream['schema']['properties'].items():
         if column in discovered_schema['properties'] and column_schema != discovered_schema['properties'][column]:
             override = copy.deepcopy(stream['schema']['properties'][column])
-            LOGGER.debug('Overriding schema for %s with %s', column, override)
+            LOGGER.info('Overriding schema for %s.%s with %s', stream['tap_stream_id'], column, override)
             discovered_schema['properties'][column].update(override)
 
     return discovered_schema
