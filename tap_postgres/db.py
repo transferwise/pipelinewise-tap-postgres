@@ -38,14 +38,27 @@ def fully_qualified_table_name(schema, table):
     return '"{}"."{}"'.format(canonicalize_identifier(schema), canonicalize_identifier(table))
 
 
-def open_connection(conn_config, logical_replication=False):
+def open_connection(conn_config, logical_replication=False, primary_connection=False):
+    if not primary_connection and conn_config['use_replica']:
+        host_key = "replica_host"
+        dbname_key = "replica_dbname"
+        user_key = "replica_user"
+        password_key = "replica_password"
+        port_key = "replica_port"
+    else:
+        host_key = "host"
+        dbname_key = "dbname"
+        user_key = "user"
+        password_key = "password"
+        port_key = "port"
+
     cfg = {
         'application_name': 'pipelinewise',
-        'host': conn_config['host'],
-        'dbname': conn_config['dbname'],
-        'user': conn_config['user'],
-        'password': conn_config['password'],
-        'port': conn_config['port'],
+        'host': conn_config[host_key],
+        'dbname': conn_config[dbname_key],
+        'user': conn_config[user_key],
+        'password': conn_config[password_key],
+        'port': conn_config[port_key],
         'connect_timeout': 30
     }
 

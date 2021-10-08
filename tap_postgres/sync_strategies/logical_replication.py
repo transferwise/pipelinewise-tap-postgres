@@ -33,7 +33,7 @@ class UnsupportedPayloadKindError(Exception):
 
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
 def get_pg_version(conn_info):
-    with post_db.open_connection(conn_info, False) as conn:
+    with post_db.open_connection(conn_info, False, True) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
             version = cur.fetchone()[0]
@@ -92,7 +92,7 @@ def fetch_current_lsn(conn_config):
     if version < 90400:
         raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
-    with post_db.open_connection(conn_config, False) as conn:
+    with post_db.open_connection(conn_config, False, True) as conn:
         with conn.cursor() as cur:
             # Use version specific lsn command
             if version >= 100000:
@@ -137,7 +137,7 @@ def create_hstore_elem_query(elem):
 
 
 def create_hstore_elem(conn_info, elem):
-    with post_db.open_connection(conn_info) as conn:
+    with post_db.open_connection(conn_info, False, True) as conn:
         with conn.cursor() as cur:
             query = create_hstore_elem_query(elem)
             cur.execute(query)
@@ -150,7 +150,7 @@ def create_array_elem(elem, sql_datatype, conn_info):
     if elem is None:
         return None
 
-    with post_db.open_connection(conn_info) as conn:
+    with post_db.open_connection(conn_info, False, True) as conn:
         with conn.cursor() as cur:
             if sql_datatype == 'bit[]':
                 cast_datatype = 'boolean[]'
@@ -516,7 +516,7 @@ def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
 
 
 def locate_replication_slot(conn_info):
-    with post_db.open_connection(conn_info, False) as conn:
+    with post_db.open_connection(conn_info, False, True) as conn:
         with conn.cursor() as cur:
             return locate_replication_slot_by_cur(cur, conn_info['dbname'], conn_info['tap_id'])
 
@@ -575,7 +575,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     version = get_pg_version(conn_info)
 
     # Create replication connection and cursor
-    conn = post_db.open_connection(conn_info, True)
+    conn = post_db.open_connection(conn_info, True, True)
     cur = conn.cursor()
 
     # Set session wal_sender_timeout for PG12 and above
