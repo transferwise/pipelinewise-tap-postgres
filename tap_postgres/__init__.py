@@ -116,8 +116,7 @@ def sync_method_for_streams(streams, state, default_replication_method):
             continue
 
         if replication_method == 'LOG_BASED' and stream_metadata.get((), {}).get('is-view'):
-            raise Exception(f'Logical Replication is NOT supported for views. ' \
-                            f'Please change the replication method for {stream["tap_stream_id"]}')
+            continue 
 
         if replication_method == 'FULL_TABLE':
             lookup[stream['tap_stream_id']] = 'full'
