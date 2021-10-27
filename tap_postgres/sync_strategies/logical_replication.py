@@ -8,6 +8,7 @@ import re
 import singer
 import warnings
 
+from select import select
 from psycopg2 import sql
 from singer import metadata, utils, get_bookmark
 from dateutil.parser import parse, UnknownTimezoneWarning, ParserError
@@ -660,6 +661,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                         state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
                     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
                     lsn_processed_count = 0
+        else:
+            try:
+                # Wait for a second unless a message arrives
+                select([cur], [], [], 1)
+            except InterruptedError:
+                pass
 
         # Every poll_interval, update latest comitted lsn position from the state_file
         if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
