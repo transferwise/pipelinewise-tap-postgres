@@ -614,6 +614,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             LOGGER.info('Breaking - %i seconds of polling with no data', poll_duration)
             break
 
+        if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
+            LOGGER.info('Breaking - reached max_run_seconds of %i', max_run_seconds)
+            break
+            
         try:
             msg = cur.read_message()
         except Exception as e:
@@ -625,10 +629,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                 LOGGER.info('Breaking - latest wal message %s is past end_lsn %s',
                             int_to_lsn(msg.data_start),
                             int_to_lsn(end_lsn))
-                break
-
-            if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
-                LOGGER.info('Breaking - reached max_run_seconds of %i', max_run_seconds)
                 break
 
             state = consume_message(logical_streams, state, msg, time_extracted, conn_info)
