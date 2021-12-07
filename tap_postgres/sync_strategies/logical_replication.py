@@ -617,7 +617,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
         if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
             LOGGER.info('Breaking - reached max_run_seconds of %i', max_run_seconds)
             break
-            
+
         try:
             msg = cur.read_message()
         except Exception as e:
