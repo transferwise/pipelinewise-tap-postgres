@@ -606,108 +606,110 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_received_timestamp = datetime.datetime.utcnow()
     poll_timestamp = datetime.datetime.utcnow()
 
-    while True:
-        # Disconnect when no data received for logical_poll_total_seconds
-        # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
-        poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
-        if poll_duration > logical_poll_total_seconds:
-            LOGGER.info('Breaking - %i seconds of polling with no data', poll_duration)
-            break
-
-        if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
-            LOGGER.info('Breaking - reached max_run_seconds of %i', max_run_seconds)
-            break
-
-        try:
-            msg = cur.read_message()
-        except Exception as e:
-            LOGGER.error(e)
-            raise
-
-        if msg:
-            if (break_at_end_lsn) and (msg.data_start > end_lsn):
-                LOGGER.info('Breaking - latest wal message %s is past end_lsn %s',
-                            int_to_lsn(msg.data_start),
-                            int_to_lsn(end_lsn))
+    try:
+        while True:
+            # Disconnect when no data received for logical_poll_total_seconds
+            # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
+            poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
+            if poll_duration > logical_poll_total_seconds:
+                LOGGER.info('Breaking - %i seconds of polling with no data', poll_duration)
                 break
 
-            state = consume_message(logical_streams, state, msg, time_extracted, conn_info)
+            if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
+                LOGGER.info('Breaking - reached max_run_seconds of %i', max_run_seconds)
+                break
 
-            # When using wal2json with write-in-chunks, multiple messages can have the same lsn
-            # This is to ensure we only flush to lsn that has completed entirely
-            if lsn_currently_processing is None:
-                lsn_currently_processing = msg.data_start
-                LOGGER.info('First wal message received is %s', int_to_lsn(lsn_currently_processing))
-
-                # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
-                lsn_to_flush = lsn_comitted
-                if lsn_currently_processing < lsn_to_flush:
-                    lsn_to_flush = lsn_currently_processing
-                LOGGER.info('Confirming write up to %s, flush to %s',
-                            int_to_lsn(lsn_to_flush),
-                            int_to_lsn(lsn_to_flush))
-                cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
-
-            elif int(msg.data_start) > lsn_currently_processing:
-                lsn_last_processed = lsn_currently_processing
-                lsn_currently_processing = msg.data_start
-                lsn_received_timestamp = datetime.datetime.utcnow()
-                lsn_processed_count = lsn_processed_count + 1
-                if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
-                    LOGGER.debug('Updating bookmarks for all streams to lsn = %s (%s)',
-                                 lsn_last_processed,
-                                 int_to_lsn(lsn_last_processed))
-                    for s in logical_streams:
-                        state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
-                    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-                    lsn_processed_count = 0
-        else:
             try:
-                # Wait for a second unless a message arrives
-                select([cur], [], [], 1)
-            except InterruptedError:
-                pass
+                msg = cur.read_message()
+            except Exception as e:
+                LOGGER.error(e)
+                raise
 
-        # Every poll_interval, update latest comitted lsn position from the state_file
-        if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-            if lsn_currently_processing is None:
-                LOGGER.info('Waiting for first wal message')
+            if msg:
+                if (break_at_end_lsn) and (msg.data_start > end_lsn):
+                    LOGGER.info('Breaking - latest wal message %s is past end_lsn %s',
+                                int_to_lsn(msg.data_start),
+                                int_to_lsn(end_lsn))
+                    break
+
+                state = consume_message(logical_streams, state, msg, time_extracted, conn_info)
+
+                # When using wal2json with write-in-chunks, multiple messages can have the same lsn
+                # This is to ensure we only flush to lsn that has completed entirely
+                if lsn_currently_processing is None:
+                    lsn_currently_processing = msg.data_start
+                    LOGGER.info('First wal message received is %s', int_to_lsn(lsn_currently_processing))
+
+                    # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
+                    lsn_to_flush = lsn_comitted
+                    if lsn_currently_processing < lsn_to_flush:
+                        lsn_to_flush = lsn_currently_processing
+                    LOGGER.info('Confirming write up to %s, flush to %s',
+                                int_to_lsn(lsn_to_flush),
+                                int_to_lsn(lsn_to_flush))
+                    cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
+
+                elif int(msg.data_start) > lsn_currently_processing:
+                    lsn_last_processed = lsn_currently_processing
+                    lsn_currently_processing = msg.data_start
+                    lsn_received_timestamp = datetime.datetime.utcnow()
+                    lsn_processed_count = lsn_processed_count + 1
+                    if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
+                        LOGGER.debug('Updating bookmarks for all streams to lsn = %s (%s)',
+                                    lsn_last_processed,
+                                    int_to_lsn(lsn_last_processed))
+                        for s in logical_streams:
+                            state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
+                        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+                        lsn_processed_count = 0
             else:
-                LOGGER.info('Lastest wal message received was %s', int_to_lsn(lsn_last_processed))
                 try:
-                    with open(state_file, mode="r", encoding="utf-8") as fh:
-                        state_comitted = json.load(fh)
-                except Exception:
-                    LOGGER.debug('Unable to open and parse %s', state_file)
-                finally:
-                    lsn_comitted = min(
-                        [get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
-                    if (lsn_currently_processing > lsn_comitted) and (lsn_comitted > lsn_to_flush):
-                        lsn_to_flush = lsn_comitted
-                        LOGGER.info('Confirming write up to %s, flush to %s',
-                                    int_to_lsn(lsn_to_flush),
-                                    int_to_lsn(lsn_to_flush))
-                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
+                    # Wait for a second unless a message arrives
+                    select([cur], [], [], 1)
+                except InterruptedError:
+                    pass
 
-            poll_timestamp = datetime.datetime.utcnow()
+            # Every poll_interval, update latest comitted lsn position from the state_file
+            if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+                if lsn_currently_processing is None:
+                    LOGGER.info('Waiting for first wal message')
+                else:
+                    LOGGER.info('Lastest wal message received was %s', int_to_lsn(lsn_last_processed))
+                    try:
+                        with open(state_file, mode="r", encoding="utf-8") as fh:
+                            state_comitted = json.load(fh)
+                    except Exception:
+                        LOGGER.debug('Unable to open and parse %s', state_file)
+                    finally:
+                        lsn_comitted = min(
+                            [get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
+                        if (lsn_currently_processing > lsn_comitted) and (lsn_comitted > lsn_to_flush):
+                            lsn_to_flush = lsn_comitted
+                            LOGGER.info('Confirming write up to %s, flush to %s',
+                                        int_to_lsn(lsn_to_flush),
+                                        int_to_lsn(lsn_to_flush))
+                            cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
 
-    # Close replication connection and cursor
-    cur.close()
-    conn.close()
+                poll_timestamp = datetime.datetime.utcnow()
 
-    if lsn_last_processed:
-        if lsn_comitted > lsn_last_processed:
-            lsn_last_processed = lsn_comitted
-            LOGGER.info('Current lsn_last_processed %s is older than lsn_comitted %s',
-                        int_to_lsn(lsn_last_processed),
-                        int_to_lsn(lsn_comitted))
+        # Close replication connection and cursor
+        cur.close()
+        conn.close()
+    finally:
+        if lsn_last_processed:
+            if lsn_comitted > lsn_last_processed:
+                lsn_last_processed = lsn_comitted
+                LOGGER.info('Current lsn_last_processed %s is older than lsn_comitted %s',
+                            int_to_lsn(lsn_last_processed),
+                            int_to_lsn(lsn_comitted))
 
-        LOGGER.info('Updating bookmarks for all streams to lsn = %s (%s)',
-                    lsn_last_processed,
-                    int_to_lsn(lsn_last_processed))
+            LOGGER.info('Updating bookmarks for all streams to lsn = %s (%s)',
+                        lsn_last_processed,
+                        int_to_lsn(lsn_last_processed))
 
-        for s in logical_streams:
-            state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
+            for s in logical_streams:
+                state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
 
-    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+
     return state
