@@ -1,0 +1,13 @@
+version: "3.3"
+
+services:
+  db:
+    image: "debezium/postgres:12-alpine"
+    container_name: ""
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=my-secret-passwd
+      - POSTGRES_DB=tap_postgres_test
+    command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
