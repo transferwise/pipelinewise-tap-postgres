@@ -31,10 +31,7 @@ It's recommended to use a virtualenv:
 or
 
 ```bash
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .
+  make venv
 ```
 
 ### Create a config.json
@@ -168,10 +165,7 @@ to the tap for the next sync.
 
 1. Install python test dependencies in a virtual env:
 ```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .[test]
+ make venv
 ```
 
 2. You need to have a postgres database to run the tests and export its credentials:
@@ -181,6 +175,8 @@ to the tap for the next sync.
   export TAP_POSTGRES_USER=<postgres-user>
   export TAP_POSTGRES_PASSWORD=<postgres-password>
 ```
+
+You can make use of the local docker-compose to spin up a test database by running `make start_db`
 
 Test objects will be created in the `postgres` database.
 
@@ -193,11 +189,6 @@ Test objects will be created in the `postgres` database.
 
 1. Install python dependencies and run python linter
 ```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .[test]
+  make venv
   make pylint
 ```
-
----
