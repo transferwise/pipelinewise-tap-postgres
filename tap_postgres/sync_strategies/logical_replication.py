@@ -60,7 +60,7 @@ def int_to_lsn(lsni):
         return None
 
     # Convert the integer to binary
-    lsnb = '{0:b}'.format(lsni)
+    lsnb = f'{lsni:b}'
 
     # file is the binary before the 32nd character, converted to hex
     if len(lsnb) > 32:
@@ -71,7 +71,7 @@ def int_to_lsn(lsni):
     # index is the binary from the 32nd character, converted to hex
     index = (format(int(lsnb[-32:], 2), 'x')).upper()
     # Formatting
-    lsn = "{}/{}".format(file, index)
+    lsn = f"{file}/{index}"
     return lsn
 
 
@@ -123,7 +123,7 @@ def get_stream_version(tap_stream_id, state):
     stream_version = singer.get_bookmark(state, tap_stream_id, 'version')
 
     if stream_version is None:
-        raise Exception("version not found for log miner {}".format(tap_stream_id))
+        raise Exception(f"version not found for log miner {tap_stream_id}")
 
     return stream_version
 
@@ -200,7 +200,7 @@ def create_array_elem(elem, sql_datatype, conn_info):
                 # custom datatypes like enums
                 cast_datatype = 'text[]'
 
-            sql_stmt = """SELECT $stitch_quote${}$stitch_quote$::{}""".format(elem, cast_datatype)
+            sql_stmt = f"""SELECT $stitch_quote${elem}$stitch_quote$::{cast_datatype}"""
             cur.execute(sql_stmt)
             res = cur.fetchone()[0]
             return res
@@ -333,7 +333,7 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
     if isinstance(elem, str):
         return elem
 
-    raise Exception("do not know how to marshall value of type {}".format(elem.__class__))
+    raise Exception(f"do not know how to marshall value of type {type(elem)}")
 
 
 def selected_array_to_singer_value(elem, sql_datatype, conn_info):
@@ -363,7 +363,7 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
 
         if not sql_datatype:
             LOGGER.info("No sql-datatype found for stream %s: %s", stream, columns[idx])
-            raise Exception("Unable to find sql-datatype for stream {}".format(stream))
+            raise Exception(f"Unable to find sql-datatype for stream {stream}")
 
         cleaned_elem = selected_value_to_singer_value(elem, sql_datatype, conn_info)
         row_to_persist += (cleaned_elem,)
@@ -396,7 +396,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
     target_stream = streams_lookup[tap_stream_id]
 
     if payload['kind'] not in {'insert', 'update', 'delete'}:
-        raise UnsupportedPayloadKindError("unrecognized replication operation: {}".format(payload['kind']))
+        raise UnsupportedPayloadKindError(f"unrecognized replication operation: {payload['kind']}")
 
     # Get the additional fields in payload that are not in schema properties:
     # only inserts and updates have the list of columns that can be used to detect any different in columns
@@ -583,7 +583,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     if version >= 120000:
         wal_sender_timeout = 10800000  # 10800000ms = 3 hours
         LOGGER.info('Set session wal_sender_timeout = %i milliseconds', wal_sender_timeout)
-        cur.execute("SET SESSION wal_sender_timeout = {}".format(wal_sender_timeout))
+        cur.execute(f"SET SESSION wal_sender_timeout = {wal_sender_timeout}")
 
     try:
         LOGGER.info('Request wal streaming from %s to %s (slot %s)',
@@ -601,7 +601,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                               })
 
     except psycopg2.ProgrammingError as ex:
-        raise Exception("Unable to start replication with logical replication (slot {})".format(ex)) from ex
+        raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
 
     lsn_received_timestamp = datetime.datetime.utcnow()
     poll_timestamp = datetime.datetime.utcnow()
