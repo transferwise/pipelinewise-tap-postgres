@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 import tap_postgres
 import tap_postgres.sync_strategies.full_table as full_table
 import tap_postgres.sync_strategies.common as pg_common
@@ -62,7 +63,8 @@ class LogicalInterruption(unittest.TestCase):
         global CAUGHT_MESSAGES
         CAUGHT_MESSAGES.clear()
 
-    def test_catalog(self):
+    @mock.patch('tap_postgres.sync_logical_streams')
+    def test_catalog(self, mock_sync_logical_streams):
         singer.write_message = singer_write_message_no_cow
         pg_common.write_schema_message = singer_write_message_ok
 
@@ -90,7 +92,7 @@ class LogicalInterruption(unittest.TestCase):
             insert_record(cur, 'COW', cow_rec)
 
         conn.close()
-           
+
         blew_up_on_cow = False
         state = {}
         #the initial phase of cows logical replication will be a full table.
@@ -99,6 +101,8 @@ class LogicalInterruption(unittest.TestCase):
             tap_postgres.do_sync(get_test_connection_config(), {'streams' : streams}, None, state)
         except Exception:
             blew_up_on_cow = True
+
+        mock_sync_logical_streams.assert_not_called()
 
         self.assertTrue(blew_up_on_cow)
 
@@ -150,6 +154,8 @@ class LogicalInterruption(unittest.TestCase):
         COW_RECORD_COUNT = 0
         CAUGHT_MESSAGES.clear()
         tap_postgres.do_sync(get_test_connection_config(), {'streams' : streams}, None, old_state)
+
+        mock_sync_logical_streams.assert_called_once()
 
         self.assertEqual(8, len(CAUGHT_MESSAGES))
 
@@ -238,7 +244,7 @@ class FullTableInterruption(unittest.TestCase):
 
         conn = get_test_connection()
         conn.autocommit = True
-        
+
         with conn.cursor() as cur:
             cow_rec = {'name': 'betty', 'colour': 'blue'}
             insert_record(cur, 'COW', {'name': 'betty', 'colour': 'blue'})
@@ -256,7 +262,7 @@ class FullTableInterruption(unittest.TestCase):
 
         state = {}
         blew_up_on_cow = False
-        
+
         #this will sync the CHICKEN but then blow up on the COW
         try:
             tap_postgres.do_sync(get_test_connection_config(), {'streams' : streams}, None, state)
