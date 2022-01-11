@@ -405,8 +405,24 @@ def main_impl():
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
-        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))
+        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
+        'use_replica': args.config.get('use_replica', False),
     }
+
+    if conn_config['use_replica']:
+        try:
+            conn_config.update({
+                # Host and Port are mandatory.
+                'replica_host': args.config["replica_host"],
+                'replica_port': args.config["replica_port"],
+                # User and Password default to the same as on the Primary.
+                'replica_user': args.config.get("replica_user", conn_config['user']),
+                'replica_password': args.config.get("replica_password", conn_config['password']),
+            })
+        except KeyError as exc:
+            raise ValueError(
+                "When 'use_replica' enabled 'replica_host' and 'replical_port' must be defined."
+            ) from exc
 
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
