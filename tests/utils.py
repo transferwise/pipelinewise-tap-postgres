@@ -10,7 +10,7 @@ from singer import get_logger, metadata
 
 LOGGER = get_logger()
 
-def get_test_connection_config(target_db='postgres'):
+def get_test_connection_config(target_db='postgres', use_replica=False):
     missing_envs = [x for x in [os.getenv('TAP_POSTGRES_HOST'),
                                 os.getenv('TAP_POSTGRES_USER'),
                                 os.getenv('TAP_POSTGRES_PASSWORD'),
@@ -24,13 +24,29 @@ def get_test_connection_config(target_db='postgres'):
                    'port': os.environ.get('TAP_POSTGRES_PORT'),
                    'dbname': target_db}
 
+    if use_replica:
+        missing_envs = [x for x in [os.getenv('TAP_POSTGRES_REPLICA_HOST'),
+                                    os.getenv('TAP_POSTGRES_REPLICA_PORT')] if x == None]
+
+        if len(missing_envs) != 0:
+            raise Exception(
+                "set TAP_POSTGRES_REPLICA_HOST, TAP_POSTGRES_REPLICA_PORT"
+                )
+
+        conn_config.update({
+            'use_replica': use_replica,
+            'replica_host': os.getenv('TAP_POSTGRES_REPLICA_HOST'),
+            'replica_port': os.getenv('TAP_POSTGRES_REPLICA_PORT'),
+        })
+
     return conn_config
 
-def get_test_connection(target_db='postgres'):
+def get_test_connection(target_db='postgres', superuser=False):
     conn_config = get_test_connection_config(target_db)
+    user = 'postgres' if superuser else conn_config['user']
     conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(conn_config['host'],
                                                                                    conn_config['dbname'],
-                                                                                   conn_config['user'],
+                                                                                   user,
                                                                                    conn_config['password'],
                                                                                    conn_config['port'])
     LOGGER.info("connecting to {}".format(conn_config['host']))

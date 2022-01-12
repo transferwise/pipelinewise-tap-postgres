@@ -9,7 +9,7 @@ pylint:
 	pylint --rcfile .pylintrc --disable duplicate-code tap_postgres/
 
 start_db:
-	docker-compose up -d --build db
+	docker-compose up -d
 
 test:
 	. ./venv/bin/activate ;\
