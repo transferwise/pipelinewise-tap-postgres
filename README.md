@@ -66,11 +66,11 @@ Full list of options in `config.json`:
 | tap_id                              | String  | No         | ID of the pipeline/tap (Default: None) |
 | itersize                            | Integer | No         | Size of PG cursor iterator when doing INCREMENTAL or FULL_TABLE  (Default: 20000) |
 | default_replication_method          | String  | No         | Default replication method to use when no one is provided in the catalog (Values: `LOG_BASED`, `INCREMENTAL` or `FULL_TABLE`)  (Default: None) |
-| use_replica                         | Boolean | No         | Use a database replica for `INCREMENTAL` and `FULL_TABLE` replication (Default : False) |
-| replica_host                        | String  | No         | PostgreSQL Replica host (required if `use_replica` is `True`)  |
-| replica_port                        | Integer | No         | PostgreSQL Replica port (required if `use_replica` is `True`)  |
-| replica_user                        | String  | No         | PostgreSQL Replica user (Default: same as `user`)              |
-| replica_password                    | String  | No         | PostgreSQL Replica password (Default: same as `password`)      |
+| use_secondary                       | Boolean | No         | Use a database replica for `INCREMENTAL` and `FULL_TABLE` replication (Default : False) |
+| secondary_host                      | String  | No         | PostgreSQL Replica host (required if `use_secondary` is `True`) |
+| secondary_port                      | Integer | No         | PostgreSQL Replica port (required if `use_secondary` is `True`) |
+| secondary_user                      | String  | No         | PostgreSQL Replica user (Default: same as `user`)              |
+| secondary_password                  | String  | No         | PostgreSQL Replica password (Default: same as `password`)      |
 
 
 ### Run the tap in Discovery Mode

@@ -48,7 +48,7 @@ def do_not_dump_catalog(catalog):
 tap_postgres.dump_catalog = do_not_dump_catalog
 full_table.UPDATE_BOOKMARK_PERIOD = 1
 
-@pytest.mark.parametrize('use_replica', [False, True])
+@pytest.mark.parametrize('use_secondary', [False, True])
 @unittest.mock.patch('psycopg2.connect', wraps=psycopg2.connect)
 class TestLogicalInterruption:
     maxDiff = None
@@ -67,11 +67,11 @@ class TestLogicalInterruption:
         global CAUGHT_MESSAGES
         CAUGHT_MESSAGES.clear()
 
-    def test_catalog(self, mock_connect, use_replica):
+    def test_catalog(self, mock_connect, use_secondary):
         singer.write_message = singer_write_message_no_cow
         pg_common.write_schema_message = singer_write_message_ok
 
-        conn_config = get_test_connection_config(use_replica=use_replica)
+        conn_config = get_test_connection_config(use_secondary=use_secondary)
         streams = tap_postgres.do_discovery(conn_config)
 
         # Assert that we connected to the correct database
@@ -81,8 +81,8 @@ class TestLogicalInterruption:
             'user': unittest.mock.ANY,
             'password': unittest.mock.ANY,
             'connect_timeout':unittest.mock.ANY,
-            'host': conn_config['replica_host'] if use_replica else conn_config['host'],
-            'port': conn_config['replica_port'] if use_replica else conn_config['port'],
+            'host': conn_config['secondary_host'] if use_secondary else conn_config['host'],
+            'port': conn_config['secondary_port'] if use_secondary else conn_config['port'],
         }
         mock_connect.assert_called_once_with(**expected_connection)
         mock_connect.reset_mock()
@@ -115,7 +115,7 @@ class TestLogicalInterruption:
         #the initial phase of cows logical replication will be a full table.
         #it will sync the first record and then blow up on the 2nd record
         try:
-            tap_postgres.do_sync(get_test_connection_config(use_replica=use_replica), {'streams' : streams}, None, state)
+            tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, state)
         except Exception:
             blew_up_on_cow = True
 
@@ -171,7 +171,7 @@ class TestLogicalInterruption:
         global COW_RECORD_COUNT
         COW_RECORD_COUNT = 0
         CAUGHT_MESSAGES.clear()
-        tap_postgres.do_sync(get_test_connection_config(use_replica=use_replica), {'streams' : streams}, None, old_state)
+        tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, old_state)
 
         mock_connect.assert_called_with(**expected_connection)
         mock_connect.reset_mock()
@@ -225,7 +225,7 @@ class TestLogicalInterruption:
         assert CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('lsn') == end_lsn
         assert CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('version') == new_version
 
-@pytest.mark.parametrize('use_replica', [False, True])
+@pytest.mark.parametrize('use_secondary', [False, True])
 @unittest.mock.patch('psycopg2.connect', wraps=psycopg2.connect)
 class TestFullTableInterruption:
     maxDiff = None
@@ -247,11 +247,11 @@ class TestFullTableInterruption:
         global CAUGHT_MESSAGES
         CAUGHT_MESSAGES.clear()
 
-    def test_catalog(self, mock_connect, use_replica):
+    def test_catalog(self, mock_connect, use_secondary):
         singer.write_message = singer_write_message_no_cow
         pg_common.write_schema_message = singer_write_message_ok
 
-        conn_config = get_test_connection_config(use_replica=use_replica)
+        conn_config = get_test_connection_config(use_secondary=use_secondary)
         streams = tap_postgres.do_discovery(conn_config)
 
         # Assert that we connected to the correct database
@@ -261,8 +261,8 @@ class TestFullTableInterruption:
             'user': unittest.mock.ANY,
             'password': unittest.mock.ANY,
             'connect_timeout':unittest.mock.ANY,
-            'host': conn_config['replica_host'] if use_replica else conn_config['host'],
-            'port': conn_config['replica_port'] if use_replica else conn_config['port'],
+            'host': conn_config['secondary_host'] if use_secondary else conn_config['host'],
+            'port': conn_config['secondary_port'] if use_secondary else conn_config['port'],
         }
         mock_connect.assert_called_once_with(**expected_connection)
         mock_connect.reset_mock()
@@ -300,7 +300,7 @@ class TestFullTableInterruption:
 
         #this will sync the CHICKEN but then blow up on the COW
         try:
-            tap_postgres.do_sync(get_test_connection_config(use_replica=use_replica), {'streams' : streams}, None, state)
+            tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, state)
         except Exception as ex:
             # LOGGER.exception(ex)
             blew_up_on_cow = True
@@ -364,7 +364,7 @@ class TestFullTableInterruption:
         global COW_RECORD_COUNT
         COW_RECORD_COUNT = 0
 
-        tap_postgres.do_sync(get_test_connection_config(use_replica=use_replica), {'streams' : streams}, None, old_state)
+        tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, old_state)
 
         mock_connect.assert_called_with(**expected_connection)
         mock_connect.reset_mock()

@@ -406,22 +406,22 @@ def main_impl():
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
         'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
-        'use_replica': args.config.get('use_replica', False),
+        'use_secondary': args.config.get('use_secondary', False),
     }
 
-    if conn_config['use_replica']:
+    if conn_config['use_secondary']:
         try:
             conn_config.update({
                 # Host and Port are mandatory.
-                'replica_host': args.config["replica_host"],
-                'replica_port': args.config["replica_port"],
+                'secondary_host': args.config['secondary_host'],
+                'secondary_port': args.config['secondary_port'],
                 # User and Password default to the same as on the Primary.
-                'replica_user': args.config.get("replica_user", conn_config['user']),
-                'replica_password': args.config.get("replica_password", conn_config['password']),
+                'secondary_user': args.config.get('secondary_user', conn_config['user']),
+                'secondary_password': args.config.get('secondary_password', conn_config['password']),
             })
         except KeyError as exc:
             raise ValueError(
-                "When 'use_replica' enabled 'replica_host' and 'replical_port' must be defined."
+                "When 'use_secondary' enabled 'secondary_host' and 'secondary_port' must be defined."
             ) from exc
 
     if args.config.get('ssl') == 'true':

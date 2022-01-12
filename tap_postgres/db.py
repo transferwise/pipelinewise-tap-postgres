@@ -47,14 +47,14 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
         'connect_timeout': 30
     }
 
-    if conn_config.get('use_replica', False) and not prioritize_primary and not logical_replication:
+    if conn_config.get('use_secondary', False) and not prioritize_primary and not logical_replication:
         # Try to use replica but fallback to primary if keys are missing. This is the same behavior as
         # https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/fastsync/commons/tap_postgres.py#L129
         cfg.update({
-            'host': conn_config.get("replica_host", conn_config['host']),
-            'port': conn_config.get("replica_port", conn_config['port']),
-            'user': conn_config.get("replica_user", conn_config['user']),
-            'password': conn_config.get("replica_password", conn_config['password']),
+            'host': conn_config.get("secondary_host", conn_config['host']),
+            'port': conn_config.get("secondary_port", conn_config['port']),
+            'user': conn_config.get("secondary_user", conn_config['user']),
+            'password': conn_config.get("secondary_password", conn_config['password']),
         })
 
     if conn_config.get('sslmode'):
