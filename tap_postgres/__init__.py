@@ -415,9 +415,6 @@ def main_impl():
                 # Host and Port are mandatory.
                 'secondary_host': args.config['secondary_host'],
                 'secondary_port': args.config['secondary_port'],
-                # User and Password default to the same as on the Primary.
-                'secondary_user': args.config.get('secondary_user', conn_config['user']),
-                'secondary_password': args.config.get('secondary_password', conn_config['password']),
             })
         except KeyError as exc:
             raise ValueError(

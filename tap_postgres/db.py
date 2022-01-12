@@ -53,8 +53,6 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
         cfg.update({
             'host': conn_config.get("secondary_host", conn_config['host']),
             'port': conn_config.get("secondary_port", conn_config['port']),
-            'user': conn_config.get("secondary_user", conn_config['user']),
-            'password': conn_config.get("secondary_password", conn_config['password']),
         })
 
     if conn_config.get('sslmode'):

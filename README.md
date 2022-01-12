@@ -69,8 +69,6 @@ Full list of options in `config.json`:
 | use_secondary                       | Boolean | No         | Use a database replica for `INCREMENTAL` and `FULL_TABLE` replication (Default : False) |
 | secondary_host                      | String  | No         | PostgreSQL Replica host (required if `use_secondary` is `True`) |
 | secondary_port                      | Integer | No         | PostgreSQL Replica port (required if `use_secondary` is `True`) |
-| secondary_user                      | String  | No         | PostgreSQL Replica user (Default: same as `user`)              |
-| secondary_password                  | String  | No         | PostgreSQL Replica password (Default: same as `password`)      |
 
 
 ### Run the tap in Discovery Mode
