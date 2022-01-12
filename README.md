@@ -175,6 +175,8 @@ to the tap for the next sync.
 ```
   export TAP_POSTGRES_HOST=<postgres-host>
   export TAP_POSTGRES_PORT=<postgres-port>
+  export TAP_POSTGRES_SECONDARY_HOST=<postgres-replica-host>
+  export TAP_POSTGRES_SECONDARY_PORT=<postgres-replica-port>
   export TAP_POSTGRES_USER=<postgres-user>
   export TAP_POSTGRES_PASSWORD=<postgres-password>
 ```
