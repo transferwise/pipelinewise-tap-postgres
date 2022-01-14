@@ -7,7 +7,7 @@
 
 **Changes**
 - local database container for dev and test purposes.
-- bump `psycopeg2-binary` from `2.8.6` to `2.9.3`
+- bump `psycopg2-binary` from `2.8.6` to `2.9.3`
 
 
 1.8.1 (2021-09-23)
