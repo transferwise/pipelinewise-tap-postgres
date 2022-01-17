@@ -1,3 +1,15 @@
+1.8.2 (2022-01-14)
+-------------------
+**Fixes**
+- LOG_BASED: catch exceptions and emit current state upon exiting
+- LOG_BASED: `max_run_seconds` only working when there are wal messages.
+- LOG_BASED: Prevent high CPU utilization while waiting for wal messages.
+
+**Changes**
+- local database container for dev and test purposes.
+- bump `psycopg2-binary` from `2.8.6` to `2.9.3`
+
+
 1.8.1 (2021-09-23)
 -------------------
 **Fixes**
