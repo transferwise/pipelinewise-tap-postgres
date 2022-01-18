@@ -18,7 +18,11 @@ def get_test_connection_config(target_db='postgres'):
     if len(missing_envs) != 0:
         raise Exception("set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT")
 
-    conn_config = {'host': os.environ.get('TAP_POSTGRES_HOST'),
+    conn_config = {'tap_id': 'test-postgres',
+                   'max_run_seconds': 5,
+                   'break_at_end_lsn': True,
+                   'logical_poll_total_seconds': 2,
+                   'host': os.environ.get('TAP_POSTGRES_HOST'),
                    'user': os.environ.get('TAP_POSTGRES_USER'),
                    'password': os.environ.get('TAP_POSTGRES_PASSWORD'),
                    'port': os.environ.get('TAP_POSTGRES_PORT'),
