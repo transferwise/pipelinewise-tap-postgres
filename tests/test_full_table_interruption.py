@@ -1,4 +1,3 @@
-import re
 import psycopg2
 import unittest.mock
 import pytest
@@ -49,6 +48,7 @@ tap_postgres.dump_catalog = do_not_dump_catalog
 full_table.UPDATE_BOOKMARK_PERIOD = 1
 
 @pytest.mark.parametrize('use_secondary', [False, True])
+@unittest.mock.patch('tap_postgres.sync_logical_streams')
 @unittest.mock.patch('psycopg2.connect', wraps=psycopg2.connect)
 class TestLogicalInterruption:
     maxDiff = None
@@ -67,7 +67,7 @@ class TestLogicalInterruption:
         global CAUGHT_MESSAGES
         CAUGHT_MESSAGES.clear()
 
-    def test_catalog(self, mock_connect, use_secondary):
+    def test_catalog(self, mock_connect, mock_sync_logical_streams, use_secondary):
         singer.write_message = singer_write_message_no_cow
         pg_common.write_schema_message = singer_write_message_ok
 
@@ -124,6 +124,8 @@ class TestLogicalInterruption:
         mock_connect.assert_called_with(**expected_connection)
         mock_connect.reset_mock()
 
+        mock_sync_logical_streams.assert_not_called()
+
         assert 7 == len(CAUGHT_MESSAGES)
 
         assert CAUGHT_MESSAGES[0]['type'] =='SCHEMA'
@@ -175,6 +177,9 @@ class TestLogicalInterruption:
 
         mock_connect.assert_called_with(**expected_connection)
         mock_connect.reset_mock()
+
+        mock_sync_logical_streams.assert_called_once()
+
 
         assert 8 == len(CAUGHT_MESSAGES)
 
