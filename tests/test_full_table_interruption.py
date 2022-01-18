@@ -73,22 +73,25 @@ class LogicalInterruption(unittest.TestCase):
         cow_stream = select_all_of_stream(cow_stream)
         cow_stream = set_replication_method_for_stream(cow_stream, 'LOG_BASED')
 
-        with get_test_connection() as conn:
-            conn.autocommit = True
-            cur = conn.cursor()
+        conn = get_test_connection()
+        conn.autocommit = True
 
-            cow_rec = {'name' : 'betty', 'colour' : 'blue',
+        with conn.cursor() as cur:
+            cow_rec = {'name': 'betty', 'colour': 'blue',
                        'timestamp_ntz': '2020-09-01 10:40:59', 'timestamp_tz': '2020-09-01 00:50:59+02'}
             insert_record(cur, 'COW', cow_rec)
 
-            cow_rec = {'name' : 'smelly', 'colour' : 'brow',
+            cow_rec = {'name': 'smelly', 'colour': 'brow',
                        'timestamp_ntz': '2020-09-01 10:40:59 BC', 'timestamp_tz': '2020-09-01 00:50:59+02 BC'}
             insert_record(cur, 'COW', cow_rec)
 
-            cow_rec = {'name' : 'pooper', 'colour' : 'green',
+            cow_rec = {'name': 'pooper', 'colour': 'green',
                        'timestamp_ntz': '30000-09-01 10:40:59', 'timestamp_tz': '10000-09-01 00:50:59+02'}
             insert_record(cur, 'COW', cow_rec)
 
+        conn.close()
+           
+        blew_up_on_cow = False
         state = {}
         #the initial phase of cows logical replication will be a full table.
         #it will sync the first record and then blow up on the 2nd record
@@ -232,22 +235,28 @@ class FullTableInterruption(unittest.TestCase):
         self.assertIsNotNone(chicken_stream)
         chicken_stream = select_all_of_stream(chicken_stream)
         chicken_stream = set_replication_method_for_stream(chicken_stream, 'FULL_TABLE')
-        with get_test_connection() as conn:
-            conn.autocommit = True
-            cur = conn.cursor()
 
-            cow_rec = {'name' : 'betty', 'colour' : 'blue'}
-            insert_record(cur, 'COW', cow_rec)
-            cow_rec = {'name' : 'smelly', 'colour' : 'brow'}
+        conn = get_test_connection()
+        conn.autocommit = True
+        
+        with conn.cursor() as cur:
+            cow_rec = {'name': 'betty', 'colour': 'blue'}
+            insert_record(cur, 'COW', {'name': 'betty', 'colour': 'blue'})
+
+            cow_rec = {'name': 'smelly', 'colour': 'brow'}
             insert_record(cur, 'COW', cow_rec)
 
-            cow_rec = {'name' : 'pooper', 'colour' : 'green'}
+            cow_rec = {'name': 'pooper', 'colour': 'green'}
             insert_record(cur, 'COW', cow_rec)
 
-            chicken_rec = {'name' : 'fred', 'colour' : 'red'}
+            chicken_rec = {'name': 'fred', 'colour': 'red'}
             insert_record(cur, 'CHICKEN', chicken_rec)
 
+        conn.close()
+
         state = {}
+        blew_up_on_cow = False
+        
         #this will sync the CHICKEN but then blow up on the COW
         try:
             tap_postgres.do_sync(get_test_connection_config(), {'streams' : streams}, None, state)

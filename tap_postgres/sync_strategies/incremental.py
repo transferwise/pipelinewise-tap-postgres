@@ -6,8 +6,8 @@ import singer
 
 from singer import utils
 from functools import partial
+from singer import metrics
 
-import singer.metrics as metrics
 import tap_postgres.db as post_db
 
 
@@ -20,12 +20,14 @@ UPDATE_BOOKMARK_PERIOD = 10000
 def fetch_max_replication_key(conn_config, replication_key, schema_name, table_name):
     with post_db.open_connection(conn_config, False) as conn:
         with conn.cursor() as cur:
-            max_key_sql = """SELECT max({})
-                              FROM {}""".format(post_db.prepare_columns_sql(replication_key),
-                                                post_db.fully_qualified_table_name(schema_name, table_name))
+            max_key_sql = f"""
+                SELECT max({post_db.prepare_columns_sql(replication_key)})
+                FROM {post_db.fully_qualified_table_name(schema_name, table_name)}"""
+
             LOGGER.info("determine max replication key value: %s", max_key_sql)
             cur.execute(max_key_sql)
             max_key = cur.fetchone()[0]
+
             LOGGER.info("max replication key value: %s", max_key)
             return max_key
 
@@ -52,7 +54,6 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
         stream=post_db.calculate_destination_stream_name(stream, md_map),
         version=stream_version)
 
-
     singer.write_message(activate_version_message)
 
     replication_key = md_map.get((), {}).get('replication-key')
@@ -64,7 +65,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
         with post_db.open_connection(conn_info) as conn:
 
             # Client side character encoding defaults to the value in postgresql.conf under client_encoding.
-            # The server / db can also have its own configred encoding.
+            # The server / db can also have its own configured encoding.
             with conn.cursor() as cur:
                 cur.execute("show server_encoding")
                 LOGGER.info("Current Server Encoding: %s", cur.fetchone()[0])
@@ -81,24 +82,16 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                 cur.itersize = post_db.CURSOR_ITER_SIZE
                 LOGGER.info("Beginning new incremental replication sync %s", stream_version)
                 if replication_key_value:
-                    select_sql = """SELECT {}
-                                    FROM {}
-                                    WHERE {} >= '{}'::{}
-                                    ORDER BY {} ASC""".format(','.join(escaped_columns),
-                                                              post_db.fully_qualified_table_name(schema_name,
-                                                                                                 stream['table_name']),
-                                                              post_db.prepare_columns_sql(replication_key),
-                                                              replication_key_value,
-                                                              replication_key_sql_datatype,
-                                                              post_db.prepare_columns_sql(replication_key))
+                    select_sql = f"""
+    SELECT {','.join(escaped_columns)}
+    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+    WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
+    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
                 else:
                     #if not replication_key_value
-                    select_sql = """SELECT {}
-                                    FROM {}
-                                    ORDER BY {} ASC""".format(','.join(escaped_columns),
-                                                              post_db.fully_qualified_table_name(schema_name,
-                                                                                                 stream['table_name']),
-                                                              post_db.prepare_columns_sql(replication_key))
+                    select_sql = f"""SELECT {','.join(escaped_columns)}
+                                    FROM { post_db.fully_qualified_table_name(schema_name, stream['table_name']),}
+                                    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
 
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
@@ -114,7 +107,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                                                             md_map)
 
                     singer.write_message(record_message)
-                    rows_saved = rows_saved + 1
+                    rows_saved += 1
 
                     #Picking a replication_key with NULL values will result in it ALWAYS been synced which is not great
                     #event worse would be allowing the NULL value to enter into the state

@@ -315,7 +315,7 @@ def schema_for_column(col_info):
         scale = post_db.numeric_scale(col_info)
         precision = post_db.numeric_precision(col_info)
         schema_name = schema_name_for_numeric_array(precision, scale)
-        column_schema['items'] = {'$ref': '#/definitions/{}'.format(schema_name)}
+        column_schema['items'] = {'$ref': f'#/definitions/{schema_name}'}
     elif col_info.sql_data_type == 'double precision[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_number_array'}
     elif col_info.sql_data_type == 'hstore[]':
@@ -364,7 +364,7 @@ def nullable_column(col_type, pk):
 
 
 def schema_name_for_numeric_array(precision, scale):
-    schema_name = 'sdc_recursive_decimal_{}_{}_array'.format(precision, scale)
+    schema_name = f'sdc_recursive_decimal_{precision}_{scale}_array'
     return schema_name
 
 
@@ -382,7 +382,7 @@ def include_array_schemas(columns, schema):
                                               'maximum': post_db.numeric_max(precision, scale),
                                               'exclusiveMinimum': True,
                                               'minimum': post_db.numeric_min(precision, scale),
-                                              'items': {'$ref': '#/definitions/{}'.format(schema_name)}}
+                                              'items': {'$ref': f'#/definitions/{schema_name}'}}
 
     return schema
 
@@ -391,7 +391,7 @@ def write_sql_data_type_md(mdata, col_info):
     c_name = col_info.column_name
     if col_info.sql_data_type == 'bit' and col_info.character_maximum_length > 1:
         mdata = metadata.write(mdata, ('properties', c_name),
-                               'sql-datatype', "bit({})".format(col_info.character_maximum_length))
+                               'sql-datatype', f"bit({col_info.character_maximum_length})")
     else:
         mdata = metadata.write(mdata, ('properties', c_name), 'sql-datatype', col_info.sql_data_type)
 
