@@ -66,6 +66,9 @@ Full list of options in `config.json`:
 | tap_id                              | String  | No         | ID of the pipeline/tap (Default: None) |
 | itersize                            | Integer | No         | Size of PG cursor iterator when doing INCREMENTAL or FULL_TABLE  (Default: 20000) |
 | default_replication_method          | String  | No         | Default replication method to use when no one is provided in the catalog (Values: `LOG_BASED`, `INCREMENTAL` or `FULL_TABLE`)  (Default: None) |
+| use_secondary                       | Boolean | No         | Use a database replica for `INCREMENTAL` and `FULL_TABLE` replication (Default : False) |
+| secondary_host                      | String  | No         | PostgreSQL Replica host (required if `use_secondary` is `True`) |
+| secondary_port                      | Integer | No         | PostgreSQL Replica port (required if `use_secondary` is `True`) |
 
 
 ### Run the tap in Discovery Mode
@@ -142,7 +145,7 @@ to the tap for the next sync.
     ```
 
     Restart your PostgreSQL service to ensure the changes take effect.
-  
+
     **Note**: For `max_replication_slots` and `max_wal_senders`, we’re defaulting to a value of 5.
     This should be sufficient unless you have a large number of read replicas connected to the master instance.
 
@@ -151,11 +154,11 @@ to the tap for the next sync.
   In PostgreSQL, a logical replication slot represents a stream of database changes that can then be replayed to a
   client in the order they were made on the original server. Each slot streams a sequence of changes from a single
   database.
-  
+
   Login to the master instance as a superuser and using the `wal2json` plugin, create a logical replication slot:
   ```
     SELECT *
-    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');  
+    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');
   ```
 
   **Note**: Replication slots are specific to a given database in a cluster. If you want to connect multiple
@@ -172,6 +175,8 @@ to the tap for the next sync.
 ```
   export TAP_POSTGRES_HOST=<postgres-host>
   export TAP_POSTGRES_PORT=<postgres-port>
+  export TAP_POSTGRES_SECONDARY_HOST=<postgres-replica-host>
+  export TAP_POSTGRES_SECONDARY_PORT=<postgres-replica-port>
   export TAP_POSTGRES_USER=<postgres-user>
   export TAP_POSTGRES_PASSWORD=<postgres-password>
 ```

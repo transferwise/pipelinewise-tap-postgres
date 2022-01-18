@@ -36,7 +36,7 @@ def fully_qualified_table_name(schema, table):
     return f'"{canonicalize_identifier(schema)}"."{canonicalize_identifier(table)}"'
 
 
-def open_connection(conn_config, logical_replication=False):
+def open_connection(conn_config, logical_replication=False, prioritize_primary=False):
     cfg = {
         'application_name': 'pipelinewise',
         'host': conn_config['host'],
@@ -46,6 +46,14 @@ def open_connection(conn_config, logical_replication=False):
         'port': conn_config['port'],
         'connect_timeout': 30
     }
+
+    if conn_config.get('use_secondary', False) and not prioritize_primary and not logical_replication:
+        # Try to use replica but fallback to primary if keys are missing. This is the same behavior as
+        # https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/fastsync/commons/tap_postgres.py#L129
+        cfg.update({
+            'host': conn_config.get("secondary_host", conn_config['host']),
+            'port': conn_config.get("secondary_port", conn_config['port']),
+        })
 
     if conn_config.get('sslmode'):
         cfg['sslmode'] = conn_config['sslmode']
