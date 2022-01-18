@@ -1,3 +1,8 @@
+1.8.3 (2022-01-18)
+-------------------
+**Fixes**
+- INCREMENTAL: generate valid SQL to extract data from tables where no `replication_key_value` in the state file.
+
 1.8.2 (2022-01-14)
 -------------------
 **Fixes**
