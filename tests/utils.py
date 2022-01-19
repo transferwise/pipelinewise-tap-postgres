@@ -11,33 +11,28 @@ from singer import get_logger, metadata
 LOGGER = get_logger()
 
 def get_test_connection_config(target_db='postgres', use_secondary=False):
-    missing_envs = [x for x in [os.getenv('TAP_POSTGRES_HOST'),
-                                os.getenv('TAP_POSTGRES_USER'),
-                                os.getenv('TAP_POSTGRES_PASSWORD'),
-                                os.getenv('TAP_POSTGRES_PORT')] if x == None]
-    if len(missing_envs) != 0:
-        raise Exception("set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT")
-
-    conn_config = {'host': os.environ.get('TAP_POSTGRES_HOST'),
-                   'user': os.environ.get('TAP_POSTGRES_USER'),
-                   'password': os.environ.get('TAP_POSTGRES_PASSWORD'),
-                   'port': os.environ.get('TAP_POSTGRES_PORT'),
-                   'dbname': target_db}
+    try:
+        conn_config = {'host': os.environ['TAP_POSTGRES_HOST'],
+                       'user': os.environ['TAP_POSTGRES_USER'],
+                       'password': os.environ['TAP_POSTGRES_PASSWORD'],
+                       'port': os.environ['TAP_POSTGRES_PORT'],
+                       'dbname': target_db}
+    except KeyError as exc:
+        raise Exception(
+            "set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT"
+        ) from exc
 
     if use_secondary:
-        missing_envs = [x for x in [os.getenv('TAP_POSTGRES_SECONDARY_HOST'),
-                                    os.getenv('TAP_POSTGRES_SECONDARY_PORT')] if x == None]
-
-        if len(missing_envs) != 0:
+        try:
+            conn_config.update({
+                'use_secondary': use_secondary,
+                'secondary_host': os.environ['TAP_POSTGRES_SECONDARY_HOST'],
+                'secondary_port': os.environ['TAP_POSTGRES_SECONDARY_PORT'],
+            })
+        except KeyError as exc:
             raise Exception(
                 "set TAP_POSTGRES_SECONDARY_HOST, TAP_POSTGRES_SECONDARY_PORT"
-                )
-
-        conn_config.update({
-            'use_secondary': use_secondary,
-            'secondary_host': os.getenv('TAP_POSTGRES_SECONDARY_HOST'),
-            'secondary_port': os.getenv('TAP_POSTGRES_SECONDARY_PORT'),
-        })
+            ) from exc
 
     return conn_config
 
