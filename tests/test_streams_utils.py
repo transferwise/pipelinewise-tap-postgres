@@ -51,7 +51,14 @@ class TestInit(unittest.TestCase):
 							'table-key-properties': ['some_id'],
 							'row-count': 1000,
 						}
+					},
+					{
+						'breadcrumb': ['properties', 'char_name'],
+						'metadata': {
+							'arbitrary_field_metadata': 'should be preserved'
+						}
 					}
+
 				]
 			}
 		]
@@ -86,7 +93,8 @@ class TestInit(unittest.TestCase):
 										  'selected-by-default': True},
 			('properties', 'char_name'): {'selected-by-default': True,
 										  'inclusion': 'available',
-										  'sql-datatype': 'character'}})
+										  'sql-datatype': 'character',
+										  'arbitrary_field_metadata': 'should be preserved'}})
 
 		self.assertEqual({'properties': {'id': {'type': ['integer'],
 												'maximum': 2147483647,
