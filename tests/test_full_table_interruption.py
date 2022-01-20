@@ -1,8 +1,8 @@
-import re
 import psycopg2
 import unittest.mock
 import pytest
 import tap_postgres
+from tap_postgres.sync_strategies import logical_replication
 import tap_postgres.sync_strategies.full_table as full_table
 import tap_postgres.sync_strategies.common as pg_common
 import singer
@@ -49,9 +49,28 @@ tap_postgres.dump_catalog = do_not_dump_catalog
 full_table.UPDATE_BOOKMARK_PERIOD = 1
 
 @pytest.mark.parametrize('use_secondary', [False, True])
+@unittest.mock.patch('tap_postgres.sync_logical_streams', wraps=tap_postgres.sync_logical_streams)
 @unittest.mock.patch('psycopg2.connect', wraps=psycopg2.connect)
 class TestLogicalInterruption:
     maxDiff = None
+
+    def setup_class(self):
+        conn_config = get_test_connection_config()
+        slot_name = logical_replication.generate_replication_slot_name(
+            dbname=conn_config['dbname'], tap_id=conn_config['tap_id']
+        )
+        with get_test_connection(superuser=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')")
+
+    def teardown_class(self):
+        conn_config = get_test_connection_config()
+        slot_name = logical_replication.generate_replication_slot_name(
+            dbname=conn_config['dbname'], tap_id=conn_config['tap_id']
+        )
+        with get_test_connection(superuser=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT * FROM pg_drop_replication_slot('{slot_name}')")
 
     def setup_method(self):
         table_spec_1 = {"columns": [{"name": "id", "type" : "serial",       "primary_key" : True},
@@ -67,7 +86,7 @@ class TestLogicalInterruption:
         global CAUGHT_MESSAGES
         CAUGHT_MESSAGES.clear()
 
-    def test_catalog(self, mock_connect, use_secondary):
+    def test_catalog(self, mock_connect, mock_sync_logical_streams, use_secondary):
         singer.write_message = singer_write_message_no_cow
         pg_common.write_schema_message = singer_write_message_ok
 
@@ -75,7 +94,16 @@ class TestLogicalInterruption:
         streams = tap_postgres.do_discovery(conn_config)
 
         # Assert that we connected to the correct database
-        expected_connection = {
+        primary_connection = {
+            'application_name': unittest.mock.ANY,
+            'dbname': unittest.mock.ANY,
+            'user': unittest.mock.ANY,
+            'password': unittest.mock.ANY,
+            'connect_timeout':unittest.mock.ANY,
+            'host': conn_config['host'],
+            'port': conn_config['port'],
+        }
+        secondary_connection = {
             'application_name': unittest.mock.ANY,
             'dbname': unittest.mock.ANY,
             'user': unittest.mock.ANY,
@@ -84,8 +112,8 @@ class TestLogicalInterruption:
             'host': conn_config['secondary_host'] if use_secondary else conn_config['host'],
             'port': conn_config['secondary_port'] if use_secondary else conn_config['port'],
         }
-        mock_connect.assert_called_once_with(**expected_connection)
-        mock_connect.reset_mock()
+
+        mock_connect.assert_called_once_with(**secondary_connection)
 
         cow_stream = [s for s in streams if s['table_name'] == 'COW'][0]
         assert cow_stream is not None
@@ -114,6 +142,7 @@ class TestLogicalInterruption:
         state = {}
         #the initial phase of cows logical replication will be a full table.
         #it will sync the first record and then blow up on the 2nd record
+        mock_connect.reset_mock()
         try:
             tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, state)
         except Exception:
@@ -121,8 +150,12 @@ class TestLogicalInterruption:
 
         assert blew_up_on_cow is True
 
-        mock_connect.assert_called_with(**expected_connection)
-        mock_connect.reset_mock()
+        mock_sync_logical_streams.assert_not_called()
+
+        mock_connect.assert_has_calls(
+            [unittest.mock.call(**primary_connection)] * 2 + \
+            [unittest.mock.call(**secondary_connection)] * 4
+        )
 
         assert 7 == len(CAUGHT_MESSAGES)
 
@@ -171,12 +204,17 @@ class TestLogicalInterruption:
         global COW_RECORD_COUNT
         COW_RECORD_COUNT = 0
         CAUGHT_MESSAGES.clear()
+        mock_connect.reset_mock()
         tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, old_state)
 
-        mock_connect.assert_called_with(**expected_connection)
-        mock_connect.reset_mock()
+        mock_sync_logical_streams.assert_called_once()
 
-        assert 8 == len(CAUGHT_MESSAGES)
+        mock_connect.assert_has_calls(
+            [unittest.mock.call(**primary_connection)] * 2 + \
+            [unittest.mock.call(**secondary_connection)] * 4
+        )
+
+        assert 10 == len(CAUGHT_MESSAGES)
 
         assert CAUGHT_MESSAGES[0]['type'] == 'SCHEMA'
 
@@ -224,6 +262,13 @@ class TestLogicalInterruption:
         assert CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('xmin') is None
         assert CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('lsn') == end_lsn
         assert CAUGHT_MESSAGES[7].value['bookmarks']['public-COW'].get('version') == new_version
+
+        assert CAUGHT_MESSAGES[8]['type'] == 'SCHEMA'
+
+        assert isinstance(CAUGHT_MESSAGES[9], singer.messages.StateMessage)
+        assert CAUGHT_MESSAGES[9].value['bookmarks']['public-COW'].get('xmin') is None
+        assert CAUGHT_MESSAGES[9].value['bookmarks']['public-COW'].get('lsn') == end_lsn
+        assert CAUGHT_MESSAGES[9].value['bookmarks']['public-COW'].get('version') == new_version
 
 @pytest.mark.parametrize('use_secondary', [False, True])
 @unittest.mock.patch('psycopg2.connect', wraps=psycopg2.connect)
