@@ -16,7 +16,8 @@ def get_test_connection_config(target_db='postgres', use_secondary=False):
                        'user': os.environ['TAP_POSTGRES_USER'],
                        'password': os.environ['TAP_POSTGRES_PASSWORD'],
                        'port': os.environ['TAP_POSTGRES_PORT'],
-                       'dbname': target_db}
+                       'dbname': target_db,
+                       'use_secondary': use_secondary,}
     except KeyError as exc:
         raise Exception(
             "set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT"
@@ -25,7 +26,6 @@ def get_test_connection_config(target_db='postgres', use_secondary=False):
     if use_secondary:
         try:
             conn_config.update({
-                'use_secondary': use_secondary,
                 'secondary_host': os.environ['TAP_POSTGRES_SECONDARY_HOST'],
                 'secondary_port': os.environ['TAP_POSTGRES_SECONDARY_PORT'],
             })
