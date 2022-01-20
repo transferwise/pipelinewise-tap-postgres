@@ -90,7 +90,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                 else:
                     #if not replication_key_value
                     select_sql = f"""SELECT {','.join(escaped_columns)}
-                                    FROM { post_db.fully_qualified_table_name(schema_name, stream['table_name']),}
+                                    FROM { post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
                                     ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
 
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
