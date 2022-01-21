@@ -10,27 +10,38 @@ from singer import get_logger, metadata
 
 LOGGER = get_logger()
 
-def get_test_connection_config(target_db='postgres'):
-    missing_envs = [x for x in [os.getenv('TAP_POSTGRES_HOST'),
-                                os.getenv('TAP_POSTGRES_USER'),
-                                os.getenv('TAP_POSTGRES_PASSWORD'),
-                                os.getenv('TAP_POSTGRES_PORT')] if x == None]
-    if len(missing_envs) != 0:
-        raise Exception("set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT")
+def get_test_connection_config(target_db='postgres', use_secondary=False):
+    try:
+        conn_config = {'host': os.environ['TAP_POSTGRES_HOST'],
+                       'user': os.environ['TAP_POSTGRES_USER'],
+                       'password': os.environ['TAP_POSTGRES_PASSWORD'],
+                       'port': os.environ['TAP_POSTGRES_PORT'],
+                       'dbname': target_db,
+                       'use_secondary': use_secondary,}
+    except KeyError as exc:
+        raise Exception(
+            "set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT"
+        ) from exc
 
-    conn_config = {'host': os.environ.get('TAP_POSTGRES_HOST'),
-                   'user': os.environ.get('TAP_POSTGRES_USER'),
-                   'password': os.environ.get('TAP_POSTGRES_PASSWORD'),
-                   'port': os.environ.get('TAP_POSTGRES_PORT'),
-                   'dbname': target_db}
+    if use_secondary:
+        try:
+            conn_config.update({
+                'secondary_host': os.environ['TAP_POSTGRES_SECONDARY_HOST'],
+                'secondary_port': os.environ['TAP_POSTGRES_SECONDARY_PORT'],
+            })
+        except KeyError as exc:
+            raise Exception(
+                "set TAP_POSTGRES_SECONDARY_HOST, TAP_POSTGRES_SECONDARY_PORT"
+            ) from exc
 
     return conn_config
 
-def get_test_connection(target_db='postgres'):
+def get_test_connection(target_db='postgres', superuser=False):
     conn_config = get_test_connection_config(target_db)
+    user = 'postgres' if superuser else conn_config['user']
     conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(conn_config['host'],
                                                                                    conn_config['dbname'],
-                                                                                   conn_config['user'],
+                                                                                   user,
                                                                                    conn_config['password'],
                                                                                    conn_config['port'])
     LOGGER.info("connecting to {}".format(conn_config['host']))

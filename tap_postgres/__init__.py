@@ -405,8 +405,21 @@ def main_impl():
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
-        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))
+        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
+        'use_secondary': args.config.get('use_secondary', False),
     }
+
+    if conn_config['use_secondary']:
+        try:
+            conn_config.update({
+                # Host and Port are mandatory.
+                'secondary_host': args.config['secondary_host'],
+                'secondary_port': args.config['secondary_port'],
+            })
+        except KeyError as exc:
+            raise ValueError(
+                "When 'use_secondary' enabled 'secondary_host' and 'secondary_port' must be defined."
+            ) from exc
 
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'

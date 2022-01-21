@@ -331,7 +331,7 @@ class TestHStoreTable(unittest.TestCase):
        table_spec = {"columns": [{"name" : 'our_pk',          "type" : "hstore", "primary_key" : True },
                                  {"name" : 'our_hstore',      "type" : "hstore" }],
                      "name" : TestHStoreTable.table_name}
-       with get_test_connection() as conn:
+       with get_test_connection(superuser=True) as conn:
            cur = conn.cursor()
            cur.execute(""" SELECT installed_version FROM pg_available_extensions WHERE name = 'hstore' """)
            if cur.fetchone()[0] is None:
@@ -536,7 +536,7 @@ class TestColumnGrants(unittest.TestCase):
     table_name = 'CHICKEN TIMES'
     user = 'tmp_user_for_grant_tests'
     password = 'password'
- 
+
     def setUp(self):
         table_spec = {"columns": [{"name" : "id",                "type" : "integer",  "serial" : True},
                                  {"name" : 'size integer',      "type" : "integer",  "quoted" : True},
@@ -545,7 +545,7 @@ class TestColumnGrants(unittest.TestCase):
                      "name" : TestColumnGrants.table_name}
         ensure_test_table(table_spec)
 
-        with get_test_connection() as conn:
+        with get_test_connection(superuser=True) as conn:
            cur = conn.cursor()
 
            sql = """ DROP USER IF EXISTS {} """.format(self.user, self.password)
@@ -560,8 +560,8 @@ class TestColumnGrants(unittest.TestCase):
            LOGGER.info("running sql: {}".format(sql))
            cur.execute(sql)
 
-           
-           
+
+
 
     def test_catalog(self):
         conn_config = get_test_connection_config()
@@ -587,7 +587,7 @@ class TestColumnGrants(unittest.TestCase):
                           ('properties', 'id'): {'inclusion': 'available',
                                                  'selected-by-default': True,
                                                  'sql-datatype': 'integer'}})
-        
+
         self.assertEqual({'definitions' : BASE_RECURSIVE_SCHEMAS,
                           'type': 'object',
                           'properties': {'id': {'type': ['null', 'integer'],

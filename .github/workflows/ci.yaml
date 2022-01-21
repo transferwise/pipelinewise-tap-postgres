@@ -35,9 +35,11 @@ jobs:
 
       - name: Tests
         env:
+          TAP_POSTGRES_HOST: localhost
           TAP_POSTGRES_PORT: 5432
           TAP_POSTGRES_USER: test_user
           TAP_POSTGRES_PASSWORD: my-secret-passwd
-          TAP_POSTGRES_HOST: localhost
+          TAP_POSTGRES_SECONDARY_HOST: localhost
+          TAP_POSTGRES_SECONDARY_PORT: 5433
           LOGGING_CONF_FILE: ./sample_logging.conf
         run: make test
