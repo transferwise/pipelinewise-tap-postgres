@@ -47,7 +47,7 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
         'connect_timeout': 30
     }
 
-    if conn_config.get('use_secondary', False) and not prioritize_primary and not logical_replication:
+    if conn_config['use_secondary'] and not prioritize_primary and not logical_replication:
         # Try to use replica but fallback to primary if keys are missing. This is the same behavior as
         # https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/fastsync/commons/tap_postgres.py#L129
         cfg.update({
