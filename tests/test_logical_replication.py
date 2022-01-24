@@ -137,7 +137,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                      self.WalMessage(payload='this is an invalid json message',
                                                                      data_start=None),
                                                      None,
-                                                     {}
+                                                     {'wal2json_message_format': 1},
                                                      )
         self.assertDictEqual({}, output)
 
@@ -148,7 +148,19 @@ class TestLogicalReplication(unittest.TestCase):
             self.WalMessage(payload='{"schema": "myschema", "table": "notmytable"}',
                             data_start='some lsn'),
             None,
-            {}
+            {'wal2json_message_format': 1},
+        )
+
+        self.assertDictEqual({}, output)
+
+    def test_consume_with_message_stream_in_payload_is_not_selected_expect_same_state_format_2(self):
+        output = logical_replication.consume_message(
+            [{'tap_stream_id': 'myschema-mytable'}],
+            {},
+            self.WalMessage(payload='{"action": "U", "schema": "myschema", "table": "notmytable"}',
+                            data_start='some lsn'),
+            None,
+            {'wal2json_message_format': 2},
         )
 
         self.assertDictEqual({}, output)
@@ -161,7 +173,18 @@ class TestLogicalReplication(unittest.TestCase):
                 self.WalMessage(payload='{"kind":"truncate", "schema": "myschema", "table": "mytable"}',
                                 data_start='some lsn'),
                 None,
-                {}
+                {'wal2json_message_format': 1},
+            )
+
+    def test_consume_with_payload_kind_is_not_supported_expect_exception_format_2(self):
+        with self.assertRaises(UnsupportedPayloadKindError):
+            logical_replication.consume_message(
+                [{'tap_stream_id': 'myschema-mytable'}],
+                {},
+                self.WalMessage(payload='{"action":"T", "schema": "myschema", "table": "mytable"}',
+                                data_start='some lsn'),
+                None,
+                {'wal2json_message_format': 2},
             )
 
     @patch('tap_postgres.logical_replication.singer.write_message')
@@ -231,11 +254,11 @@ class TestLogicalReplication(unittest.TestCase):
                                     '"schema": "myschema", '
                                     '"table": "mytable",'
                                     '"columnnames": ["id", "date_created", "new_col"],'
-                                    '"columnnames": [1, null, "some random text"]'
+                                    '"columnvalues": [1, null, "some random text"]'
                                     '}',
                             data_start='some lsn'),
             None,
-            {}
+            {'wal2json_message_format': 1},
         )
 
         self.assertDictEqual(return_v,
@@ -250,7 +273,96 @@ class TestLogicalReplication(unittest.TestCase):
                                  }
                              })
 
-        refresh_schema_mock.assert_called_once_with({}, [streams[0]])
+        refresh_schema_mock.assert_called_once_with({'wal2json_message_format': 1}, [streams[0]])
+        send_schema_mock.assert_called_once()
+        write_message_mock.assert_called_once()
+
+    @patch('tap_postgres.logical_replication.singer.write_message')
+    @patch('tap_postgres.logical_replication.sync_common.send_schema_message')
+    @patch('tap_postgres.logical_replication.refresh_streams_schema')
+    def test_consume_message_with_new_column_in_payload_will_refresh_schema_format_2(self,
+                                                                                     refresh_schema_mock,
+                                                                                     send_schema_mock,
+                                                                                     write_message_mock):
+        streams = [
+            {
+                'tap_stream_id': 'myschema-mytable',
+                'stream': 'mytable',
+                'schema': {
+                    'properties': {
+                        'id': {},
+                        'date_created': {}
+                    }
+                },
+                'metadata': [
+                    {
+                        'breadcrumb': [],
+                        'metadata': {
+                            'is-view': False,
+                            'table-key-properties': ['id'],
+                            'schema-name': 'myschema'
+                        }
+                    },
+                    {
+                        "breadcrumb": [
+                            "properties",
+                            "id"
+                        ],
+                        "metadata": {
+                            "sql-datatype": "integer",
+                            "inclusion": "automatic",
+                        }
+                    },
+                    {
+                        "breadcrumb": [
+                            "properties",
+                            "date_created"
+                        ],
+                        "metadata": {
+                            "sql-datatype": "datetime",
+                            "inclusion": "available",
+                            "selected": True
+                        }
+                    }
+                ],
+            }
+        ]
+
+        return_v = logical_replication.consume_message(
+            streams,
+            {
+                'bookmarks': {
+                    "myschema-mytable": {
+                        "last_replication_method": "LOG_BASED",
+                        "lsn": None,
+                        "version": 1000,
+                        "xmin": None
+                    }
+                }
+            },
+            self.WalMessage(payload='{"action": "I", '
+                                    '"schema": "myschema", '
+                                    '"table": "mytable",'
+                                    '"columns": [{"name": "id", "value": 1}, {"name": "date_created", "value": null}, {"name": "new_col", "value": "some random text"}]'
+                                    '}',
+                            data_start='some lsn'),
+            None,
+            {'wal2json_message_format': 2},
+        )
+
+        self.assertDictEqual(return_v,
+                             {
+                                 'bookmarks': {
+                                     "myschema-mytable": {
+                                         "last_replication_method": "LOG_BASED",
+                                         "lsn": "some lsn",
+                                         "version": 1000,
+                                         "xmin": None
+                                     }
+                                 }
+                             })
+
+        refresh_schema_mock.assert_called_once_with({'wal2json_message_format': 2}, [streams[0]])
         send_schema_mock.assert_called_once()
         write_message_mock.assert_called_once()
 
