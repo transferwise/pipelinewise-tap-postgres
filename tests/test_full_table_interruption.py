@@ -48,7 +48,7 @@ def do_not_dump_catalog(catalog):
 tap_postgres.dump_catalog = do_not_dump_catalog
 full_table.UPDATE_BOOKMARK_PERIOD = 1
 
-@pytest.mark.parametrize('use_secondary', [False, True])
+@pytest.mark.parametrize('use_secondary,message_format', [(False, 1), (True, 2)])
 @unittest.mock.patch('tap_postgres.sync_logical_streams', wraps=tap_postgres.sync_logical_streams)
 @unittest.mock.patch('psycopg2.connect', wraps=psycopg2.connect)
 class TestLogicalInterruption:
@@ -86,11 +86,11 @@ class TestLogicalInterruption:
         global CAUGHT_MESSAGES
         CAUGHT_MESSAGES.clear()
 
-    def test_catalog(self, mock_connect, mock_sync_logical_streams, use_secondary):
+    def test_catalog(self, mock_connect, mock_sync_logical_streams, use_secondary, message_format):
         singer.write_message = singer_write_message_no_cow
         pg_common.write_schema_message = singer_write_message_ok
 
-        conn_config = get_test_connection_config(use_secondary=use_secondary)
+        conn_config = get_test_connection_config(use_secondary=use_secondary, message_format=message_format)
         streams = tap_postgres.do_discovery(conn_config)
 
         # Assert that we connected to the correct database
@@ -144,7 +144,7 @@ class TestLogicalInterruption:
         #it will sync the first record and then blow up on the 2nd record
         mock_connect.reset_mock()
         try:
-            tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, state)
+            tap_postgres.do_sync(conn_config, {'streams' : streams}, None, state)
         except Exception:
             blew_up_on_cow = True
 
@@ -204,8 +204,7 @@ class TestLogicalInterruption:
         global COW_RECORD_COUNT
         COW_RECORD_COUNT = 0
         CAUGHT_MESSAGES.clear()
-        mock_connect.reset_mock()
-        tap_postgres.do_sync(get_test_connection_config(use_secondary=use_secondary), {'streams' : streams}, None, old_state)
+        tap_postgres.do_sync(conn_config, {'streams' : streams}, None, old_state)
 
         mock_sync_logical_streams.assert_called_once()
 
