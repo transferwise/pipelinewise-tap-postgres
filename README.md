@@ -69,6 +69,7 @@ Full list of options in `config.json`:
 | use_secondary                       | Boolean | No         | Use a database replica for `INCREMENTAL` and `FULL_TABLE` replication (Default : False) |
 | secondary_host                      | String  | No         | PostgreSQL Replica host (required if `use_secondary` is `True`) |
 | secondary_port                      | Integer | No         | PostgreSQL Replica port (required if `use_secondary` is `True`) |
+| wal2json_message_format             | Integer | No         | Which `wal2json` message format to use (1 or 2).              |
 
 
 ### Run the tap in Discovery Mode

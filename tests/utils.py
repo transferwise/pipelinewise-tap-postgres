@@ -10,14 +10,15 @@ from singer import get_logger, metadata
 
 LOGGER = get_logger()
 
-def get_test_connection_config(target_db='postgres', use_secondary=False):
+def get_test_connection_config(target_db='postgres', use_secondary=False, message_format=1):
     try:
         conn_config = {'host': os.environ['TAP_POSTGRES_HOST'],
                        'user': os.environ['TAP_POSTGRES_USER'],
                        'password': os.environ['TAP_POSTGRES_PASSWORD'],
                        'port': os.environ['TAP_POSTGRES_PORT'],
                        'dbname': target_db,
-                       'use_secondary': use_secondary,}
+                       'use_secondary': use_secondary,
+                       'wal2json_message_format': message_format}
     except KeyError as exc:
         raise Exception(
             "set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT"
