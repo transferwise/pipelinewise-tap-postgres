@@ -12,7 +12,11 @@ LOGGER = get_logger()
 
 def get_test_connection_config(target_db='postgres', use_secondary=False, message_format=1):
     try:
-        conn_config = {'host': os.environ['TAP_POSTGRES_HOST'],
+        conn_config = {'tap_id': 'test-postgres',
+                       'max_run_seconds': 5,
+                       'break_at_end_lsn': True,
+                       'logical_poll_total_seconds': 2,
+                       'host': os.environ['TAP_POSTGRES_HOST'],
                        'user': os.environ['TAP_POSTGRES_USER'],
                        'password': os.environ['TAP_POSTGRES_PASSWORD'],
                        'port': os.environ['TAP_POSTGRES_PORT'],
@@ -34,6 +38,21 @@ def get_test_connection_config(target_db='postgres', use_secondary=False, messag
             raise Exception(
                 "set TAP_POSTGRES_SECONDARY_HOST, TAP_POSTGRES_SECONDARY_PORT"
             ) from exc
+
+    if use_secondary:
+        missing_envs = [x for x in [os.getenv('TAP_POSTGRES_SECONDARY_HOST'),
+                                    os.getenv('TAP_POSTGRES_SECONDARY_PORT')] if x == None]
+
+        if len(missing_envs) != 0:
+            raise Exception(
+                "set TAP_POSTGRES_SECONDARY_HOST, TAP_POSTGRES_SECONDARY_PORT"
+                )
+
+        conn_config.update({
+            'use_secondary': use_secondary,
+            'secondary_host': os.getenv('TAP_POSTGRES_SECONDARY_HOST'),
+            'secondary_port': os.getenv('TAP_POSTGRES_SECONDARY_PORT'),
+        })
 
     return conn_config
 
