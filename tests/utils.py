@@ -10,6 +10,47 @@ from singer import get_logger, metadata
 
 LOGGER = get_logger()
 
+
+class MockedConnect:
+    class cursor:
+        return_value = 1234
+        counter_limit = 3
+        fetchone_return_value = [5]
+
+        def __init__(self, *args, **kwargs):
+            self.counter = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            pass
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self.counter += 1
+            if self.counter < self.counter_limit:
+                return [self.return_value]
+            raise StopIteration
+
+        def fetchone(self):
+            return self.fetchone_return_value
+
+        def execute(self, *args, **kwargs):
+            pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args, **kwargs):
+        pass
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+
 def get_test_connection_config(target_db='postgres', use_secondary=False):
     try:
         conn_config = {'host': os.environ['TAP_POSTGRES_HOST'],
