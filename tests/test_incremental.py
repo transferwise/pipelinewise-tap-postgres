@@ -9,6 +9,7 @@ from tap_postgres.sync_strategies import incremental
 
 
 class TestIncremental(TestCase):
+    """Test Cases for Incremental"""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -39,6 +40,7 @@ class TestIncremental(TestCase):
         self.state = {'bookmarks': {self.stream['tap_stream_id']: {'version': 1, 'replication_key_value': 'foo'}}}
 
     def test_fetch_max_replication_key(self):
+        """Test if fetch_max_replication works correctly"""
         expected_max_key = MockedConnect.cursor.fetchone_return_value[0]
         replication_key = 'foo_key'
         schema_name = 'foo_schema'
@@ -50,6 +52,7 @@ class TestIncremental(TestCase):
 
     @patch("psycopg2.extras.register_hstore")
     def test_sync_table(self, mocked_register_hstore):
+        """Test for sync_table if it works correctly"""
         desired_columns = ['foo_key']
         self.state['bookmarks'] = {}
         expected_state_replication_key_value = MockedConnect.cursor.return_value
@@ -63,6 +66,7 @@ class TestIncremental(TestCase):
     @patch('tap_postgres.sync_strategies.incremental.post_db.hstore_available')
     @patch('psycopg2.extras.register_hstore')
     def test_sync_table_if_not_hstore_available(self, _, mocked_hstore_available):
+        """Test for sync_table_ if hstore is unavailable"""
         desired_columns = ['foo_key']
         expected_state_replication_key_value = MockedConnect.cursor.return_value
         mocked_hstore_available.return_value = False
@@ -73,7 +77,10 @@ class TestIncremental(TestCase):
 
     @patch("tap_postgres.sync_strategies.incremental.singer.write_message")
     @patch("psycopg2.extras.register_hstore")
-    def test_sync_table_if_rows_saved_is_a_multiply_of_update_bookmark_period(self, mocked_register_hstore, mocked_singer_write):
+    def test_sync_table_if_rows_saved_is_a_multiply_of_update_bookmark_period(self,
+                                                                              mocked_register_hstore,
+                                                                              mocked_singer_write):
+        """Test for sync_table if rows_saved is a multiply of UPDATE_BOOKMARK_PERION"""
         original_update_bookmark_period = incremental.UPDATE_BOOKMARK_PERIOD
         incremental.UPDATE_BOOKMARK_PERIOD = MockedConnect.cursor.counter_limit - 1
         desired_columns = ['foo_key']
@@ -87,6 +94,5 @@ class TestIncremental(TestCase):
         self.assertEqual(expected_state_replication_key_value,
                          actual_state['bookmarks'][self.stream['tap_stream_id']]['replication_key_value'],
                          )
-        mocked_singer_write.assert_called_with(singer.StateMessage(value=self.state))
-
         incremental.UPDATE_BOOKMARK_PERIOD = original_update_bookmark_period
+        mocked_singer_write.assert_called_with(singer.StateMessage(value=self.state))
