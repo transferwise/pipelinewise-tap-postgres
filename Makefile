@@ -13,4 +13,4 @@ start_db:
 
 test:
 	. ./venv/bin/activate ;\
-	pytest --cov=tap_postgres  --cov-fail-under=65 tests -v
+	pytest --cov=tap_postgres  --cov-fail-under=68 tests -v
