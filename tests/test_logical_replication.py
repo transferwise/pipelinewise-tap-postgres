@@ -136,7 +136,6 @@ class TestLogicalReplication(unittest.TestCase):
                                                      {},
                                                      self.WalMessage(payload='this is an invalid json message',
                                                                      data_start=None),
-                                                     None,
                                                      {'wal2json_message_format': 1},
                                                      )
         self.assertDictEqual({}, output)
@@ -147,7 +146,6 @@ class TestLogicalReplication(unittest.TestCase):
             {},
             self.WalMessage(payload='{"schema": "myschema", "table": "notmytable"}',
                             data_start='some lsn'),
-            None,
             {'wal2json_message_format': 1},
         )
 
@@ -157,9 +155,8 @@ class TestLogicalReplication(unittest.TestCase):
         output = logical_replication.consume_message(
             [{'tap_stream_id': 'myschema-mytable'}],
             {},
-            self.WalMessage(payload='{"action": "U", "schema": "myschema", "table": "notmytable"}',
+            self.WalMessage(payload='{"action": "U", "schema": "myschema", "table": "notmytable", "timestamp": "2022-03-04T19:41:29+0000"}',
                             data_start='some lsn'),
-            None,
             {'wal2json_message_format': 2},
         )
 
@@ -172,7 +169,6 @@ class TestLogicalReplication(unittest.TestCase):
                 {},
                 self.WalMessage(payload='{"kind":"truncate", "schema": "myschema", "table": "mytable"}',
                                 data_start='some lsn'),
-                None,
                 {'wal2json_message_format': 1},
             )
 
@@ -181,9 +177,8 @@ class TestLogicalReplication(unittest.TestCase):
             logical_replication.consume_message(
                 [{'tap_stream_id': 'myschema-mytable'}],
                 {},
-                self.WalMessage(payload='{"action":"T", "schema": "myschema", "table": "mytable"}',
+                self.WalMessage(payload='{"action":"T", "schema": "myschema", "table": "mytable", "timestamp": "2022-03-04T19:41:29+0000"}',
                                 data_start='some lsn'),
-                None,
                 {'wal2json_message_format': 2},
             )
 
@@ -257,7 +252,6 @@ class TestLogicalReplication(unittest.TestCase):
                                     '"columnvalues": [1, null, "some random text"]'
                                     '}',
                             data_start='some lsn'),
-            None,
             {'wal2json_message_format': 1},
         )
 
@@ -343,10 +337,10 @@ class TestLogicalReplication(unittest.TestCase):
             self.WalMessage(payload='{"action": "I", '
                                     '"schema": "myschema", '
                                     '"table": "mytable",'
-                                    '"columns": [{"name": "id", "value": 1}, {"name": "date_created", "value": null}, {"name": "new_col", "value": "some random text"}]'
+                                    '"columns": [{"name": "id", "value": 1}, {"name": "date_created", "value": null}, {"name": "new_col", "value": "some random text"}],'
+                                    '"timestamp": "2022-03-04T19:41:29+0000"'
                                     '}',
                             data_start='some lsn'),
-            None,
             {'wal2json_message_format': 2},
         )
 
