@@ -81,18 +81,12 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
                 cur.itersize = post_db.CURSOR_ITER_SIZE
                 LOGGER.info("Beginning new incremental replication sync %s", stream_version)
-                if replication_key_value:
-                    select_sql = f"""
-    SELECT {','.join(escaped_columns)}
-    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-    WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
-    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
-                else:
-                    #if not replication_key_value
-                    select_sql = f"""SELECT {','.join(escaped_columns)}
-                                    FROM { post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-                                    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
-
+                select_sql = _get_select_sql({"escaped_columns": escaped_columns,
+                                              "replication_key": replication_key,
+                                              "replication_key_sql_datatype": replication_key_sql_datatype,
+                                              "replication_key_value": replication_key_value,
+                                              "schema_name": schema_name,
+                                              "stream": stream})
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
 
@@ -124,3 +118,24 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                     counter.increment()
 
     return state
+
+
+def _get_select_sql(params):
+    escaped_columns = params['escaped_columns']
+    replication_key = params['replication_key']
+    replication_key_sql_datatype = params['replication_key_sql_datatype']
+    replication_key_value = params['replication_key_value']
+    schema_name = params['schema_name']
+    stream = params['stream']
+    if replication_key_value:
+        select_sql = f"""
+    SELECT {','.join(escaped_columns)}
+    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+    WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
+    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
+    else:
+        # if not replication_key_value
+        select_sql = f"""SELECT {','.join(escaped_columns)}
+                                    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+                                    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
+    return select_sql

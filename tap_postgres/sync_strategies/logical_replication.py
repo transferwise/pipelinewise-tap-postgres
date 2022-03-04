@@ -98,10 +98,8 @@ def fetch_current_lsn(conn_config):
             # Use version specific lsn command
             if version >= 100000:
                 cur.execute("SELECT pg_current_wal_lsn() AS current_lsn")
-            elif version >= 90400:
-                cur.execute("SELECT pg_current_xlog_location() AS current_lsn")
             else:
-                raise Exception('Logical replication not supported before PostgreSQL 9.4')
+                cur.execute("SELECT pg_current_xlog_location() AS current_lsn")
 
             current_lsn = cur.fetchone()[0]
             return lsn_to_int(current_lsn)
