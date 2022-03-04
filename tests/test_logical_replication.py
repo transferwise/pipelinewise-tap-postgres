@@ -862,7 +862,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if datatype is time with time zone and elem starts with 24"""
         og_sql_datatype = 'time with time zone'
         expected_output = '01:12:11'
-        elem = '24:12:11-0100'
+        elem = '24:12:11-01'
         conn_info = None
         actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
 
