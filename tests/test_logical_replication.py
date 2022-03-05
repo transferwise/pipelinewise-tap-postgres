@@ -678,7 +678,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
                           'tap_id': 'tap_id_value',
                           'max_run_seconds': 10,
                           'break_at_end_lsn': False,
-                          'logical_poll_total_seconds': 1}
+                          'logical_poll_total_seconds': 1,
+                          'wal2json_message_format': 1}
 
         self.logical_streams = [{
             'tap_stream_id': 'foo-bar',
@@ -1108,7 +1109,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         self.conn_info['debug_lsn'] = True
         for kind in ('insert', 'update'):
             msg.update_payload(kind)
-            actual_output = logical_replication.consume_message(streams, state, msg, time_extracted, self.conn_info)
+            actual_output = logical_replication.consume_message(streams, state, msg, self.conn_info)
             self.assertDictEqual(expected_output, actual_output)
 
     @patch('tap_postgres.sync_strategies.logical_replication.refresh_streams_schema')
@@ -1134,11 +1135,10 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         }]
 
         state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo'}}}
-        time_extracted = datetime(2020, 9, 1, 23, 10, 59, tzinfo=tzoffset(None, 0))
         self.conn_info['debug_lsn'] = True
         expected_message = f'Unable to find sql-datatype for stream {streams[0]}'
         with self.assertRaises(Exception) as exp:
-            logical_replication.consume_message(streams, state, msg, time_extracted, self.conn_info)
+            logical_replication.consume_message(streams, state, msg, self.conn_info)
 
         self.assertEqual(expected_message, str(exp.exception))
 
@@ -1201,7 +1201,12 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
             decode=True,
             start_lsn=state['bookmarks']['foo-bar']['lsn'],
             status_interval=10,
-            options={'write-in-chunks': 1, 'add-tables': 'schema_name_value.table_name_value'}
+            options={
+                'write-in-chunks': 1,
+                'add-tables': 'schema_name_value.table_name_value',
+                'include-timestamp': True,
+                'include-types': False,
+            },
         )
 
     @patch('tap_postgres.sync_strategies.logical_replication.datetime.datetime')
@@ -1236,7 +1241,12 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
             decode=True,
             start_lsn=state['bookmarks']['foo-bar']['lsn'],
             status_interval=10,
-            options={'write-in-chunks': 1, 'add-tables': 'schema_name_value.table_name_value'}
+            options={
+                'write-in-chunks': 1,
+                'add-tables': 'schema_name_value.table_name_value',
+                'include-timestamp': True,
+                'include-types': False,
+            },
         )
 
     @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
