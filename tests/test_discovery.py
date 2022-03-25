@@ -473,7 +473,7 @@ class TestRangeTable(unittest.TestCase):
 
         with get_test_connection() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-                cur.execute("""INSERT INTO "CHICKEN TIMES" (our_int_array_pk, our_string_array) VALUES ('{{1,2,3},{4,5,6}}', '{{"a","b","c"}}' )""")
+                cur.execute("""INSERT INTO "CHICKEN TIMES" (id, date_range) VALUES ('1', '[2010-01-01, 2010-01-10)' )""")
                 cur.execute("""SELECT * FROM  "CHICKEN TIMES" """)
 
                 self.assertEqual(metadata.to_map(stream_dict.get('metadata')),
@@ -482,7 +482,7 @@ class TestRangeTable(unittest.TestCase):
                                   ('properties', 'date_range') : {'inclusion': 'available', 'sql-datatype' : 'daterange',  'selected-by-default' : True}})
 
 
-                self.assertEqual({'properties': {'id':         {'type': ['null', 'integer']},
+                self.assertEqual({'properties': {'id':         {'maximum': 2147483647, 'minimum': -2147483648, 'type': ['integer']},
                                                  'date_range': {'type': ['null', 'string']}},
                                   'type': 'object',
                                   'definitions' : BASE_RECURSIVE_SCHEMAS},
