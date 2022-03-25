@@ -23,6 +23,7 @@ Column = collections.namedtuple('Column', [
 INTEGER_TYPES = {'integer', 'smallint', 'bigint'}
 FLOAT_TYPES = {'real', 'double precision'}
 JSON_TYPES = {'json', 'jsonb'}
+RANGE_TYPES = {'int4range', 'int8range', 'numrange', 'tsrange', 'tstzrange', 'daterange'}
 BASE_RECURSIVE_SCHEMAS = {
     'sdc_recursive_integer_array': {'type': ['null', 'integer', 'array'],
                                     'items': {'$ref': '#/definitions/sdc_recursive_integer_array'}},
@@ -279,6 +280,9 @@ def schema_for_column_datatype(col):
     if data_type in {'cidr', 'inet', 'macaddr'}:
         schema['type'] = nullable_column('string', col.is_primary_key)
         return schema
+
+    if data_type in RANGE_TYPES:
+        schema['type'] = nullable_column('string', col.is_primary_key)
 
     return schema
 
