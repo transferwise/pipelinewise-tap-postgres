@@ -452,6 +452,43 @@ class TestMoney(unittest.TestCase):
                                   'definitions' : BASE_RECURSIVE_SCHEMAS},
                                  stream_dict.get('schema'))
 
+
+class TestRangeTable(unittest.TestCase):
+    maxDiff = None
+    table_name = 'CHICKEN TIMES'
+
+    def setUp(self):
+       table_spec = {"columns": [{"name" : 'id',               "type" : "integer", "primary_key" : True },
+                                 {"name" : 'date_range',       "type" : "daterange" }],
+                     "name" : TestHStoreTable.table_name}
+       ensure_test_table(table_spec)
+
+    def test_catalog(self):
+        conn_config = get_test_connection_config()
+        streams = tap_postgres.do_discovery(conn_config)
+        chicken_streams = [s for s in streams if s['tap_stream_id'] == 'public-CHICKEN TIMES']
+        self.assertEqual(len(chicken_streams), 1)
+        stream_dict = chicken_streams[0]
+        stream_dict.get('metadata').sort(key=lambda md: md['breadcrumb'])
+
+        with get_test_connection() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                cur.execute("""INSERT INTO "CHICKEN TIMES" (our_int_array_pk, our_string_array) VALUES ('{{1,2,3},{4,5,6}}', '{{"a","b","c"}}' )""")
+                cur.execute("""SELECT * FROM  "CHICKEN TIMES" """)
+
+                self.assertEqual(metadata.to_map(stream_dict.get('metadata')),
+                                 {() : {'table-key-properties': ['id'], 'database-name': 'postgres', 'schema-name': 'public', 'is-view': False, 'row-count': 0},
+                                  ('properties', 'id') : {'inclusion': 'automatic', 'sql-datatype' : 'integer',  'selected-by-default' : True},
+                                  ('properties', 'date_range') : {'inclusion': 'available', 'sql-datatype' : 'daterange',  'selected-by-default' : True}})
+
+
+                self.assertEqual({'properties': {'id':         {'type': ['null', 'integer']},
+                                                 'date_range': {'type': ['null', 'string']}},
+                                  'type': 'object',
+                                  'definitions' : BASE_RECURSIVE_SCHEMAS},
+                                 stream_dict.get('schema'))
+
+
 class TestArraysTable(unittest.TestCase):
     maxDiff = None
     table_name = 'CHICKEN TIMES'
