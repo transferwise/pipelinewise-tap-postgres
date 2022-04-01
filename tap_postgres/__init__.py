@@ -42,7 +42,11 @@ def do_discovery(conn_config):
     """
     with post_db.open_connection(conn_config) as conn:
         LOGGER.info("Discovering db %s", conn_config['dbname'])
-        streams = discover_db(conn, conn_config.get('filter_schemas'))
+        streams = discover_db(
+            conn,
+            conn_config.get('filter_schemas'),
+            conn_config.get('filter_tables').split(',') if conn_config.get('filter_tables') else None,
+        )
 
     if len(streams) == 0:
         raise RuntimeError('0 tables were discovered across the entire cluster')
@@ -402,6 +406,7 @@ def main_impl():
         # Optional config keys
         'tap_id': args.config.get('tap_id'),
         'filter_schemas': args.config.get('filter_schemas'),
+        'filter_tables': args.config.get('filter_tables'),
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),

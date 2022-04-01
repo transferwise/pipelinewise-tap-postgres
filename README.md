@@ -58,6 +58,7 @@ Full list of options in `config.json`:
 | password                            | String  | Yes        | PostgreSQL password                                           |
 | dbname                              | String  | Yes        | PostgreSQL database name                                      |
 | filter_schemas                      | String  | No         | Comma separated schema names to scan only the required schemas to improve the performance of data extraction. (Default: None) |
+| filter_tables                       | String  | No         | Comma separated tables names to scan only the required tables. |
 | ssl                                 | String  | No         | If set to `"true"` then use SSL via postgres sslmode `require` option. If the server does not accept SSL connections or the client certificate is not recognized the connection will fail. (Default: None) |
 | logical_poll_total_seconds          | Integer | No         | Stop running the tap when no data received from wal after certain number of seconds. (Default: 10800) |
 | break_at_end_lsn                    | Boolean | No         | Stop running the tap if the newly received lsn is after the max lsn that was detected when the tap started. (Default: true) |
