@@ -365,17 +365,6 @@ class TestHStoreTable(unittest.TestCase):
                                   'definitions' : BASE_RECURSIVE_SCHEMAS},
                                  stream_dict.get('schema'))
 
-    def test_escaping_values(self):
-        key = 'nickname'
-        value = "Dave's Courtyard"
-        elem = '"{}"=>"{}"'.format(key, value)
-
-        with get_test_connection() as conn:
-          with conn.cursor() as cur:
-            query = tap_postgres.sync_strategies.logical_replication.create_hstore_elem_query(elem)
-            self.assertEqual(query.as_string(cur), "SELECT hstore_to_array('\"nickname\"=>\"Dave''s Courtyard\"')")
-
-
 class TestEnumTable(unittest.TestCase):
     maxDiff = None
     table_name = 'CHICKEN TIMES'

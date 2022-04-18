@@ -261,15 +261,13 @@ class TestLogicalReplication(unittest.TestCase):
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_expect_iso_format(self):
         output = logical_replication.selected_value_to_singer_value_impl('2020-09-01 20:10:56',
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('2020-09-01T20:10:56+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_datetime_expect_iso_format(self):
         output = logical_replication.selected_value_to_singer_value_impl(datetime(2020, 9, 1, 20, 10, 59),
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('2020-09-01T20:10:59+00:00', output)
 
@@ -279,8 +277,7 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('10000-09-01 20:10:56',
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
@@ -290,8 +287,7 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('0000-09-01 20:10:56',
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
@@ -301,8 +297,7 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('1000-09-01 20:10:56 BC',
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
@@ -312,51 +307,44 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('1000-09-01 20:10:56 AC',
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_min(self):
         output = logical_replication.selected_value_to_singer_value_impl('0001-01-01 00:00:00.000123',
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('0001-01-01T00:00:00.000123+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_max(self):
         output = logical_replication.selected_value_to_singer_value_impl('9999-12-31 23:59:59.999999',
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_datetime_min(self):
         output = logical_replication.selected_value_to_singer_value_impl(datetime(1, 1, 1, 0, 0, 0, 123),
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('0001-01-01T00:00:00.000123+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_datetime_max(self):
         output = logical_replication.selected_value_to_singer_value_impl(datetime(9999, 12, 31, 23, 59, 59, 999999),
-                                                                         'timestamp without time zone',
-                                                                         None)
+                                                                         'timestamp without time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_expect_iso_format(self):
         output = logical_replication.selected_value_to_singer_value_impl('2020-09-01 20:10:56+05',
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('2020-09-01T20:10:56+05:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_datetime_expect_iso_format(self):
         output = logical_replication.selected_value_to_singer_value_impl(datetime(2020, 9, 1, 23, 10, 59,
                                                                                   tzinfo=tzoffset(None, -3600)),
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('2020-09-01T23:10:59-01:00', output)
 
@@ -366,8 +354,7 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('10000-09-01 20:10:56+06',
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
@@ -377,8 +364,7 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('0000-09-01 20:10:56+01',
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
@@ -388,8 +374,7 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('1000-09-01 20:10:56+05 BC',
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
@@ -399,43 +384,38 @@ class TestLogicalReplication(unittest.TestCase):
         should fallback to max datetime allowed
         """
         output = logical_replication.selected_value_to_singer_value_impl('1000-09-01 20:10:56-09 AC',
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_min(self):
         output = logical_replication.selected_value_to_singer_value_impl('0001-01-01 00:00:00.000123+04',
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_string_max(self):
         output = logical_replication.selected_value_to_singer_value_impl('9999-12-31 23:59:59.999999-03',
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_datetime_min(self):
         output = logical_replication.selected_value_to_singer_value_impl(datetime(1, 1, 1, 0, 0, 0, 123,
                                                                                   tzinfo=tzoffset(None, 14400)),
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_timestamp_tz_value_as_datetime_max(self):
         output = logical_replication.selected_value_to_singer_value_impl(datetime(9999, 12, 31, 23, 59, 59, 999999,
                                                                                   tzinfo=tzoffset(None, -14400)),
-                                                                         'timestamp with time zone',
-                                                                         None)
+                                                                         'timestamp with time zone')
 
         self.assertEqual('9999-12-31T23:59:59.999+00:00', output)
 
     def test_selected_value_to_singer_value_impl_with_date_value_as_string_expect_iso_format(self):
-        output = logical_replication.selected_value_to_singer_value_impl('2021-09-07', 'date', None)
+        output = logical_replication.selected_value_to_singer_value_impl('2021-09-07', 'date')
 
         self.assertEqual('2021-09-07T00:00:00+00:00', output)
 
@@ -445,7 +425,7 @@ class TestLogicalReplication(unittest.TestCase):
         is > 9999 (which is valid in postgres) should fallback to max date
         allowed
         """
-        output = logical_replication.selected_value_to_singer_value_impl('10000-09-01', 'date', None)
+        output = logical_replication.selected_value_to_singer_value_impl('10000-09-01', 'date')
 
         self.assertEqual('9999-12-31T00:00:00+00:00', output)
 
@@ -513,22 +493,19 @@ class TestLogicalReplication(unittest.TestCase):
 
     def test_selected_value_to_singer_value_impl_with_null_json_returns_None(self):
         output = logical_replication.selected_value_to_singer_value_impl(None,
-                                                                         'json',
-                                                                         None)
+                                                                         'json')
 
         self.assertEqual(None, output)
 
     def test_selected_value_to_singer_value_impl_with_empty_json_returns_empty_dict(self):
         output = logical_replication.selected_value_to_singer_value_impl('{}',
-                                                                         'json',
-                                                                         None)
+                                                                         'json')
 
         self.assertEqual({}, output)
 
     def test_selected_value_to_singer_value_impl_with_non_empty_json_returns_equivalent_dict(self):
         output = logical_replication.selected_value_to_singer_value_impl('{"key1": "A", "key2": [{"kk": "yo"}, {}]}',
-                                                                         'json',
-                                                                         None)
+                                                                         'json')
 
         self.assertEqual({
             'key1': 'A',
@@ -537,22 +514,19 @@ class TestLogicalReplication(unittest.TestCase):
 
     def test_selected_value_to_singer_value_impl_with_null_jsonb_returns_None(self):
         output = logical_replication.selected_value_to_singer_value_impl(None,
-                                                                         'jsonb',
-                                                                         None)
+                                                                         'jsonb')
 
         self.assertEqual(None, output)
 
     def test_selected_value_to_singer_value_impl_with_empty_jsonb_returns_empty_dict(self):
         output = logical_replication.selected_value_to_singer_value_impl('{}',
-                                                                         'jsonb',
-                                                                         None)
+                                                                         'jsonb')
 
         self.assertEqual({}, output)
 
     def test_selected_value_to_singer_value_impl_with_non_empty_jsonb_returns_equivalent_dict(self):
         output = logical_replication.selected_value_to_singer_value_impl('{"key1": "A", "key2": [{"kk": "yo"}, {}]}',
-                                                                         'jsonb',
-                                                                         None)
+                                                                         'jsonb')
 
         self.assertEqual({
             'key1': 'A',
@@ -679,25 +653,10 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         actual_value = logical_replication.get_stream_version(tap_stream_id, state)
         self.assertEqual(state['bookmarks']['foo']['version'], actual_value)
 
-    def test_tuples_to_map(self):
-        """Test if the output of tuples_to_map is as expected"""
-        accum = {'foo_key': 'foo_value'}
-        t = ['bar_1', 'bar_2']
-        expected_output = accum.copy()
-        expected_output[t[0]] = t[1]
-
-        actual_output = logical_replication.tuples_to_map(accum, t)
-        self.assertEqual(expected_output, actual_output)
-
-    @patch("psycopg2.connect")
-    def test_create_hstore_elem(self, mocked_connect):
-        """Test if the output of create_hstore_elem is as expected"""
-        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
-        mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
-        mocked_fetchone.return_value = (['foo', 'bar'],)
-        elem = 'foo=>bar'
+    def test_create_hstore_elem(self):
+        elem = '"foo"=>"bar"'
         expected_output = {'foo': 'bar'}
-        actual_output = logical_replication.create_hstore_elem(self.conn_info, elem)
+        actual_output = logical_replication.create_hstore_elem(elem)
         self.assertDictEqual(expected_output, actual_output)
 
     @patch("psycopg2.connect")
@@ -806,9 +765,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if sql_datatype is money"""
         elem = 'foo'
         og_sql_datatype = 'money'
-        conn_info = None
         expected_output = elem
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -818,9 +776,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         # maximum value is hardcoded! and is 9999-12-31 23:59:59.999000
         elem = datetime(9999, 12, 31, 23, 59, 59, 999001, tzinfo=timezone.utc)
         og_sql_datatype = 'timestamp with time zone'
-        conn_info = None
         expected_output = logical_replication.FALLBACK_DATETIME
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -830,9 +787,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         # maximum value is hardcoded! and is 9999-12-31 23:59:59.999000
         elem = '9999-12-31T23:59:59.9999999+00:00'
         og_sql_datatype = 'timestamp with time zone'
-        conn_info = None
         expected_output = logical_replication.FALLBACK_DATETIME
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -840,10 +796,9 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if datatype is date and elm type is datetime"""
         elem = date(2022, 12, 31)
         og_sql_datatype = 'date'
-        conn_info = None
         expected_output = '2022-12-31T00:00:00+00:00'
 
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
         self.assertEqual(expected_output, actual_output)
 
     def test_slctv2sngrv_impl_with_sql_datatype_is_date_with_invalid_elem_raises_exception(self):
@@ -851,20 +806,17 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
          if datatype is date and elem is invalid"""
         elem = 'foo'
         og_sql_datatype = 'date'
-        conn_info = None
         self.assertRaises(ValueError,
                           logical_replication.selected_value_to_singer_value_impl,
                           elem,
-                          og_sql_datatype,
-                          conn_info)
+                          og_sql_datatype)
 
     def test_slctv2sngrv_impl_with_sql_datatype_is_time_with_time_zone_and_elem_starts_with_24(self):
         """Test selected_value_to_singer_value_impl if datatype is time with time zone and elem starts with 24"""
         og_sql_datatype = 'time with time zone'
         expected_output = '01:12:11'
         elem = '24:12:11-01'
-        conn_info = None
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -873,8 +825,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         og_sql_datatype = 'time without time zone'
         expected_output = '00:12:11'
         test_elem = '24:12:11'
-        conn_info = None
-        actual_output = logical_replication.selected_value_to_singer_value_impl(test_elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(test_elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -882,8 +833,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if datatype is bit"""
         og_sql_datatype = 'bit'
         elem = True
-        conn_info = None
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertTrue(actual_output)
 
@@ -891,9 +841,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if datatype is int"""
         og_sql_datatype = 'foo'
         elem = 23
-        conn_info = None
         expected_output = elem
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -901,30 +850,23 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if datatype is boolean"""
         og_sql_datatype = 'boolean'
         elem = 'foo'
-        conn_info = None
         expected_output = elem
         actual_output = logical_replication.selected_value_to_singer_value_impl(
             elem,
-            og_sql_datatype,
-            conn_info
+            og_sql_datatype
         )
 
         self.assertEqual(expected_output, actual_output)
 
-    @patch("psycopg2.connect")
-    def test_slctv2sngrv_impl_with_sql_datatype_is_hstore(self, mocked_connect):
+    def test_slctv2sngrv_impl_with_sql_datatype_is_hstore(self):
         """Test selected_value_to_singer_value_impl if datatype is hstore"""
-        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
-        mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
-        mocked_fetchone.return_value = (['1', '0', '2', '1'],)
         og_sql_datatype = 'hstore'
-        hstore_elem = '1=>0,2=>1'
+        hstore_elem = '"1"=>"0","2"=>"1"'
         expected_output = {'1': '0', '2': '1'}
 
         actual_output = logical_replication.selected_value_to_singer_value_impl(
             hstore_elem,
-            og_sql_datatype,
-            self.conn_info
+            og_sql_datatype
         )
 
         self.assertEqual(expected_output, actual_output)
@@ -933,9 +875,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if datatype contains numeric"""
         og_sql_datatype = 'foo numeric bar'
         elem = '2'
-        conn_info = None
         expected_output = decimal.Decimal(elem)
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -943,9 +884,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl if elem is float"""
         og_sql_datatype = 'foo'
         elem = 3.14
-        conn_info = None
         expected_output = elem
-        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_output, actual_output)
 
@@ -953,10 +893,9 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test selected_value_to_singer_value_impl with invalid type of elem raises an exception"""
         og_sql_datatype = 'foo'
         elem = {}
-        conn_info = None
         expected_message = f'do not know how to marshall value of type {type(elem)}'
         with self.assertRaises(Exception) as exp:
-            logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+            logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype)
 
         self.assertEqual(expected_message, str(exp.exception))
 
