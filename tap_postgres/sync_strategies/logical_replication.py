@@ -3,6 +3,7 @@ import pytz
 import decimal
 import psycopg2
 import copy
+import csv
 import json
 import re
 import singer
@@ -129,9 +130,24 @@ def create_hstore_elem(elem):
     return HstoreAdapter.parse(elem, None)
 
 
+def local_array_parsing(elem, cast=None):
+    elem = [elem[1:-1]]
+    reader = csv.reader(elem, delimiter=',', escapechar='\\', quotechar='"')
+    array = next(reader)
+    array = [None if element.lower() == 'null' else cast(element) if cast else element for element in array]
+    return array
+
+
 def create_array_elem(elem, sql_datatype, conn_info):
     if elem is None:
         return None
+
+    if sql_datatype == 'text[]':
+        return local_array_parsing(elem)
+    elif sql_datatype == 'integer[]':
+        return local_array_parsing(elem, int)
+    elif sql_datatype == 'character varying[]':
+        return local_array_parsing(elem)
 
     with post_db.open_connection(conn_info, False, True) as conn:
         with conn.cursor() as cur:
@@ -139,8 +155,6 @@ def create_array_elem(elem, sql_datatype, conn_info):
                 cast_datatype = 'boolean[]'
             elif sql_datatype == 'boolean[]':
                 cast_datatype = 'boolean[]'
-            elif sql_datatype == 'character varying[]':
-                cast_datatype = 'character varying[]'
             elif sql_datatype == 'cidr[]':
                 cast_datatype = 'cidr[]'
             elif sql_datatype == 'citext[]':
@@ -151,8 +165,6 @@ def create_array_elem(elem, sql_datatype, conn_info):
                 cast_datatype = 'double precision[]'
             elif sql_datatype == 'hstore[]':
                 cast_datatype = 'text[]'
-            elif sql_datatype == 'integer[]':
-                cast_datatype = 'integer[]'
             elif sql_datatype == 'inet[]':
                 cast_datatype = 'inet[]'
             elif sql_datatype == 'json[]':
@@ -169,8 +181,6 @@ def create_array_elem(elem, sql_datatype, conn_info):
                 cast_datatype = 'real[]'
             elif sql_datatype == 'smallint[]':
                 cast_datatype = 'smallint[]'
-            elif sql_datatype == 'text[]':
-                cast_datatype = 'text[]'
             elif sql_datatype in ('time without time zone[]', 'time with time zone[]'):
                 cast_datatype = 'text[]'
             elif sql_datatype in ('timestamp with time zone[]', 'timestamp without time zone[]'):
