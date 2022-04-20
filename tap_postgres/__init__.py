@@ -6,7 +6,6 @@ import psycopg2.extras
 import psycopg2.extensions
 import singer
 import singer.schema
-import signal
 
 from singer import utils, metadata, get_bookmark
 from singer.catalog import Catalog
@@ -21,20 +20,6 @@ from tap_postgres.discovery_utils import discover_db
 from tap_postgres.stream_utils import (
     dump_catalog, clear_state_on_replication_change,
     is_selected_via_metadata, refresh_streams_schema, any_logical_streams)
-
-
-psycopg2.extensions.set_wait_callback(psycopg2.extras.wait_select)
-
-
-def handle_signal(sig=None, frame=None):
-    """
-    signal handler for sigterms
-    raise sigint because that's how psycopg2 aborts running queries
-    """
-    raise KeyboardInterrupt("RECEIVED SIGTERM. RAISING SIGINT TO ABORT POSTGRES QUERY")
-
-
-signal.signal(signal.SIGTERM, handle_signal)
 
 LOGGER = singer.get_logger('tap_postgres')
 
