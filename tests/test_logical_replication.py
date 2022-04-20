@@ -1,7 +1,12 @@
+import json
 import unittest
+import decimal
+
+import singer
+import psycopg2
 
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, date, timezone
 from unittest.mock import patch
 from dateutil.tz import tzoffset
 
@@ -553,3 +558,686 @@ class TestLogicalReplication(unittest.TestCase):
             'key1': 'A',
             'key2': [{'kk': 'yo'}, {}]
         }, output)
+
+
+class TestAdditionalLogicalReplication(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.conn_info = {'host': 'foo',
+                          'dbname': 'foo_db',
+                          'user': 'foo_user',
+                          'password': 'foo_pass',
+                          'port': 12345,
+                          'use_secondary': False,
+                          'tap_id': 'tap_id_value',
+                          'max_run_seconds': 10,
+                          'break_at_end_lsn': False,
+                          'logical_poll_total_seconds': 1}
+
+        self.logical_streams = [{
+            'tap_stream_id': 'foo-bar',
+            'schema': {'properties': {'foo_desired': 'b'}},
+            'stream': 'test',
+            'table_name': 'table_name_value',
+            'metadata': [{'metadata': {'sql-datatype': 'test', 'schema-name': 'schema_name_value'},
+                          'breadcrumb': ["properties", "foo_desired"]}]
+        }]
+
+    @patch("psycopg2.connect")
+    def test_fetch_current_lsn_raises_exception_on_different_versions_of_pg(self, mocked_connect):
+        """Test if it raises exception on unsupported versions"""
+        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
+        mocked_fetch_one = mocked_cursor.return_value.__enter__.return_value.fetchone
+        test_versions = [110000, 100000, 90600, 90500, 90400, 90399]
+        for version in test_versions:
+            mocked_fetch_one.return_value = [version]
+            self.assertRaises(Exception, logical_replication.fetch_current_lsn, self.conn_info)
+
+    @patch("tap_postgres.sync_strategies.logical_replication.get_pg_version")
+    @patch("psycopg2.connect")
+    def test_fetch_current_lsn(self, mocked_connect, mocked_pg_version):
+        """ Test if fetch_current_lsn method woks as expected """
+        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
+        mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
+        test_versions = [110002, 90421]
+        test_lsn = '1/2'
+
+        # Look at tap_postgres.sync_strategies.logical_replication.lsn_to_int to find out why!
+        converted_lsn_to_int = 4294967298
+
+        for version in test_versions:
+            mocked_pg_version.return_value = version
+            mocked_fetchone.return_value = [test_lsn]
+            actual_value = logical_replication.fetch_current_lsn(self.conn_info)
+            self.assertEqual(converted_lsn_to_int, actual_value)
+
+    def test_add_automatic_properties_if_debug_lsn_is_off(self):
+        """Test if add_automatic_property returns expected value if debug_lsn is off"""
+        stream = {'schema': {'properties': {'_sdc_deleted_at': 'foo'}}}
+        expected_stream = {
+            'schema': {
+                'properties': {
+                    '_sdc_deleted_at': {
+                        'format': 'date-time',
+                        'type': ['null', 'string']}
+                }
+            }
+        }
+        with self.assertLogs(level='DEBUG') as foo_log:
+            actual_stream = logical_replication.add_automatic_properties(stream=stream, debug_lsn=False)
+            self.assertDictEqual(expected_stream, actual_stream)
+            self.assertEqual(['DEBUG:tap_postgres:debug_lsn is OFF'], foo_log.output)
+
+    def test_add_automatic_properties_if_debug_lsn_is_on(self):
+        """Test if add_automatic_property returns expected value if debug_lsn is on"""
+        stream = {'schema': {'properties': {'_sdc_deleted_at': 'foo'}}}
+        expected_stream = {
+            'schema': {
+                'properties': {
+                    '_sdc_deleted_at': {
+                        'format': 'date-time',
+                        'type': ['null', 'string']
+                    },
+                    '_sdc_lsn': {'type': ['null', 'string']}
+                }
+            }
+        }
+        with self.assertLogs(level='DEBUG') as foo_log:
+            actual_stream = logical_replication.add_automatic_properties(stream=stream, debug_lsn=True)
+            self.assertDictEqual(expected_stream, actual_stream)
+            self.assertEqual(['DEBUG:tap_postgres:debug_lsn is ON'], foo_log.output)
+
+    def test_lsn_to_int_return_none_if_lsn_is_none(self):
+        """Test lsn_to_int if lsn is None"""
+        lsn = None
+        actual_output = logical_replication.lsn_to_int(lsn)
+        self.assertIsNone(actual_output)
+
+    def test_int_to_lsn(self):
+        """Test if int_to_lsn returns expected values"""
+        values_to_test = [(None, None),
+                          (12, '0/C'),  # length < 32
+                          (2**123, '80000000000000000000000/0')  # Length > 32
+                          ]
+        for lsni, expected_output in values_to_test:
+            actual_output = logical_replication.int_to_lsn(lsni)
+            self.assertEqual(expected_output, actual_output)
+
+    def test_get_stream_version_raises_exception_if_version_is_none(self):
+        """Test get_stream_version raises an expection if version is None"""
+        tap_stream_id = 'foo'
+        state = {'bookmarks': {'bar': {'version': None}}}
+
+        with self.assertRaises(Exception) as exp:
+            logical_replication.get_stream_version(tap_stream_id, state)
+        self.assertEqual(f'version not found for log miner {tap_stream_id}', str(exp.exception))
+
+    def test_get_stream_version_not_none(self):
+        """Test if get_stream_version works correctly"""
+        tap_stream_id = 'foo'
+        state = {'bookmarks': {'foo': {'version': 'foo_version'}}}
+        actual_value = logical_replication.get_stream_version(tap_stream_id, state)
+        self.assertEqual(state['bookmarks']['foo']['version'], actual_value)
+
+    def test_tuples_to_map(self):
+        """Test if the output of tuples_to_map is as expected"""
+        accum = {'foo_key': 'foo_value'}
+        t = ['bar_1', 'bar_2']
+        expected_output = accum.copy()
+        expected_output[t[0]] = t[1]
+
+        actual_output = logical_replication.tuples_to_map(accum, t)
+        self.assertEqual(expected_output, actual_output)
+
+    @patch("psycopg2.connect")
+    def test_create_hstore_elem(self, mocked_connect):
+        """Test if the output of create_hstore_elem is as expected"""
+        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
+        mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
+        mocked_fetchone.return_value = (['foo', 'bar'],)
+        elem = 'foo=>bar'
+        expected_output = {'foo': 'bar'}
+        actual_output = logical_replication.create_hstore_elem(self.conn_info, elem)
+        self.assertDictEqual(expected_output, actual_output)
+
+    @patch("psycopg2.connect")
+    def test_create_array_elem(self, mocked_connect):
+        """Test if the output of create_array_elem is as expected"""
+        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
+        mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
+        test_values = [('foo',  '{bar}', ['bar']),
+                       ('bit[]', {1}, [True]),
+                       ('foo', None, None),
+                       ('boolean[]', {True}, [True]),
+                       ('character varying[]', {1, 'foo'}, ['1', "'foo'"]),
+                       ('cidr[]', "{127.0.0.1}", ['127.0.0.1/32']),
+                       ('citext[]', {1, 'foo'}, ['1', "'foo'"]),
+                       ('date[]', '{2022-11-11}', ['2022-11-11']),
+                       ('double precision[]', {234.45}, [234.45]),
+                       ('hstore[]', {'foo'}, ["'foo'"]),
+                       ('integer[]', {123}, [123]),
+                       ('inet[]', "{127.0.0.1}", ['127.0.0.1']),
+                       ('json[]', {"foo": "bar"}, ["'foo': 'bar'"]),
+                       ('jsonb[]', {"foo": "bar"}, ["'foo': 'bar'"]),
+                       ('macaddr[]', "{aa:bb:cc:dd:ee:ff}", ['aa:bb:cc:dd:ee:ff']),
+                       ('money[]', {12.5}, ['12.5']),
+                       ('numeric[]', {12.5}, ['12.5']),
+                       ('real[]', {12.5}, [12.5]),
+                       ('smallint[]', {12}, [12]),
+                       ('text[]', '{foo}', ['foo']),
+                       ('time without time zone[]', '{22:22:22}', ['22:22:22']),
+                       ('time with time zone[]', '{22:22:22+00:00}', ['22:22:22+00:00']),
+                       ('timestamp without time zone[]', '{2022-11-11T22:22:22}', ['2022-11-11T22:22:22']),
+                       ('uuid[]', '{aabbccdd}', ['aabbccdd'])]
+
+        for sql_datatype, elem, expected_output in test_values:
+            mocked_fetchone.return_value = [(expected_output), ]
+            actual_output = logical_replication.create_array_elem(elem, sql_datatype, self.conn_info)
+            self.assertEqual(expected_output, actual_output)
+
+    def test_selected_array_to_singer_value(self):
+        """Test if selected_array_to_singer_value returns excpected output"""
+        sql_datatype = 'date'
+        test_values = [
+            (['2022-11-11', '2022-11-12'], ['2022-11-11T00:00:00+00:00', '2022-11-12T00:00:00+00:00']),
+            ('2022-11-11', '2022-11-11T00:00:00+00:00')
+        ]
+        for elem, expected_output in test_values:
+            actual_output = logical_replication.selected_array_to_singer_value(elem, sql_datatype, self.conn_info)
+            self.assertEqual(expected_output, actual_output)
+
+    @patch("psycopg2.connect")
+    def test_selected_value_to_singer_value(self, mocked_connect):
+        """Test if selected_value_to_singer_value returns expected value"""
+        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
+        mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
+        mocked_fetchone.return_value = (['foo'],)
+        test_values = [
+            ('bar', '{foo}', '{foo}'),
+            ('text[]', '{foo}', ['foo'])
+        ]
+        for sql_datatype, elem, expected_output in test_values:
+            actual_output = logical_replication.selected_value_to_singer_value(elem, sql_datatype, self.conn_info)
+            self.assertEqual(expected_output, actual_output)
+
+    def test_row_to_singer_message_raises_exception_if_no_sql_datatype_in_md_map(self):
+        """Test row_to_singer_message raises exception if no sql_datatype in md_map"""
+        stream = 'bar'
+        row = ['foo']
+        version = 3
+        columns = ['foo']
+        time_extracted = 5
+        md_map = {('properties', 'foo'): {}}
+
+        with self.assertRaises(Exception) as exp:
+            logical_replication.row_to_singer_message(
+                stream, row, version, columns, time_extracted, md_map, self.conn_info
+            )
+
+        self.assertEqual(f'Unable to find sql-datatype for stream {stream}', str(exp.exception))
+
+    def test_row_to_singer_message(self):
+        """Test if row_to_singer_message output is as expected"""
+        stream = {'stream': 1}
+        row = ['foo']
+        version = 3
+        columns = ['foo']
+        time_extracted = None
+
+        md_map = {('properties', 'foo'): {'sql-datatype': '[foo]', 'schema-name': 'bar'}}
+        actual_output = logical_replication.row_to_singer_message(
+            stream, row, version, columns, time_extracted, md_map, self.conn_info
+        )
+
+        expected_output = singer.RecordMessage(stream='None-1', record={'foo': 'foo'}, version=version)
+        self.assertEqual(expected_output, actual_output)
+
+    @patch("psycopg2.connect")
+    def test_locate_replication_slot(self, mocked_connect):
+        """Test locate_replication_slot returns excpected value"""
+        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
+        mocked_fetchall = mocked_cursor.return_value.__enter__.return_value.fetchall
+        mocked_fetchall.return_value = ['foo']
+        expected_output = f'pipelinewise_{self.conn_info["dbname"]}'
+        actual_output = logical_replication.locate_replication_slot(self.conn_info)
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_if_sql_datatype_is_money(self):
+        """Test selected_value_to_singer_value_impl if sql_datatype is money"""
+        elem = 'foo'
+        og_sql_datatype = 'money'
+        conn_info = None
+        expected_output = elem
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_if_timestamp_with_time_zone_as_datatype_and_greater_than_fallback_datetime(self):
+        """Test selected_value_to_singer_value_impl if datatype is
+        timestamp with time zone and greater than FALLBACK_DATETIME"""
+        # maximum value is hardcoded! and is 9999-12-31 23:59:59.999000
+        elem = datetime(9999, 12, 31, 23, 59, 59, 999001, tzinfo=timezone.utc)
+        og_sql_datatype = 'timestamp with time zone'
+        conn_info = None
+        expected_output = logical_replication.FALLBACK_DATETIME
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_datatype_timestamp_with_time_zone_and_parsed_elm_greater_than_and_not_datetime(self):
+        """Test selected_value_to_singer_value_impl if datatype is
+        timestamp with time zone and parsed not datetime value greater than FALLBACK_DATETIME"""
+        # maximum value is hardcoded! and is 9999-12-31 23:59:59.999000
+        elem = '9999-12-31T23:59:59.9999999+00:00'
+        og_sql_datatype = 'timestamp with time zone'
+        conn_info = None
+        expected_output = logical_replication.FALLBACK_DATETIME
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_is_date_with_elm_is_datetime(self):
+        """Test selected_value_to_singer_value_impl if datatype is date and elm type is datetime"""
+        elem = date(2022, 12, 31)
+        og_sql_datatype = 'date'
+        conn_info = None
+        expected_output = '2022-12-31T00:00:00+00:00'
+
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_is_date_with_invalid_elem_raises_exception(self):
+        """Test selected_value_to_singer_value_impl raises ValueError exception
+         if datatype is date and elem is invalid"""
+        elem = 'foo'
+        og_sql_datatype = 'date'
+        conn_info = None
+        self.assertRaises(ValueError,
+                          logical_replication.selected_value_to_singer_value_impl,
+                          elem,
+                          og_sql_datatype,
+                          conn_info)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_is_time_with_time_zone_and_elem_starts_with_24(self):
+        """Test selected_value_to_singer_value_impl if datatype is time with time zone and elem starts with 24"""
+        og_sql_datatype = 'time with time zone'
+        expected_output = '01:12:11'
+        elem = '24:12:11-01'
+        conn_info = None
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_is_time_without_time_zone_elem_starts_with_24(self):
+        """Test selected_value_to_singer_value_impl if datatype is time without time zone and elem starts with 24"""
+        og_sql_datatype = 'time without time zone'
+        expected_output = '00:12:11'
+        test_elem = '24:12:11'
+        conn_info = None
+        actual_output = logical_replication.selected_value_to_singer_value_impl(test_elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_is_bit(self):
+        """Test selected_value_to_singer_value_impl if datatype is bit"""
+        og_sql_datatype = 'bit'
+        elem = True
+        conn_info = None
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertTrue(actual_output)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_is_int(self):
+        """Test selected_value_to_singer_value_impl if datatype is int"""
+        og_sql_datatype = 'foo'
+        elem = 23
+        conn_info = None
+        expected_output = elem
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_is_boolean(self):
+        """Test selected_value_to_singer_value_impl if datatype is boolean"""
+        og_sql_datatype = 'boolean'
+        elem = 'foo'
+        conn_info = None
+        expected_output = elem
+        actual_output = logical_replication.selected_value_to_singer_value_impl(
+            elem,
+            og_sql_datatype,
+            conn_info
+        )
+
+        self.assertEqual(expected_output, actual_output)
+
+    @patch("psycopg2.connect")
+    def test_slctv2sngrv_impl_with_sql_datatype_is_hstore(self, mocked_connect):
+        """Test selected_value_to_singer_value_impl if datatype is hstore"""
+        mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
+        mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
+        mocked_fetchone.return_value = (['1', '0', '2', '1'],)
+        og_sql_datatype = 'hstore'
+        hstore_elem = '1=>0,2=>1'
+        expected_output = {'1': '0', '2': '1'}
+
+        actual_output = logical_replication.selected_value_to_singer_value_impl(
+            hstore_elem,
+            og_sql_datatype,
+            self.conn_info
+        )
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_with_sql_datatype_contains_numeric(self):
+        """Test selected_value_to_singer_value_impl if datatype contains numeric"""
+        og_sql_datatype = 'foo numeric bar'
+        elem = '2'
+        conn_info = None
+        expected_output = decimal.Decimal(elem)
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_with_float_elem(self):
+        """Test selected_value_to_singer_value_impl if elem is float"""
+        og_sql_datatype = 'foo'
+        elem = 3.14
+        conn_info = None
+        expected_output = elem
+        actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_slctv2sngrv_impl_raises_exception_with_invalid_type_of_elem(self):
+        """Test selected_value_to_singer_value_impl with invalid type of elem raises an exception"""
+        og_sql_datatype = 'foo'
+        elem = {}
+        conn_info = None
+        expected_message = f'do not know how to marshall value of type {type(elem)}'
+        with self.assertRaises(Exception) as exp:
+            logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
+
+        self.assertEqual(expected_message, str(exp.exception))
+
+    @patch('tap_postgres.sync_strategies.logical_replication.refresh_streams_schema')
+    @patch('tap_postgres.sync_strategies.logical_replication.sync_common.send_schema_message')
+    def test_consume_message_if_payload_kind_insert_or_update(self, *args):
+        """Test consume_message if the kind of payload is insert or update"""
+        class msg:
+            data_start = 'foo_start'
+            payload = None
+
+            @classmethod
+            def update_payload(cls, kind):
+                cls.payload = json.dumps(
+                    {
+                        'schema': 'foo',
+                        'table': 'bar',
+                        'kind': kind,
+                        'columnnames': ['_sdc_deleted_at'],
+                        'columnvalues': ['foo_column']
+                    }
+                )
+
+        streams = [{
+            'tap_stream_id': 'foo-bar',
+            'schema': {'properties': {'foo_desired': 'b'}},
+            'stream': 'test',
+            'metadata': [{'metadata': {'good': 'test'}, 'breadcrumb': 'foo'}]
+        }]
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo_version'}}}
+        time_extracted = datetime(2020, 9, 1, 23, 10, 59, tzinfo=tzoffset(None, -3600))
+
+        expected_output = {
+            'bookmarks': {
+                'foo-bar': {
+                    'foo': 'bar',
+                    'lsn': msg.data_start,
+                    'version': state['bookmarks']['foo-bar']['version']
+                }
+            }
+        }
+        self.conn_info['debug_lsn'] = True
+        for kind in ('insert', 'update'):
+            msg.update_payload(kind)
+            actual_output = logical_replication.consume_message(streams, state, msg, time_extracted, self.conn_info)
+            self.assertDictEqual(expected_output, actual_output)
+
+    @patch('tap_postgres.sync_strategies.logical_replication.refresh_streams_schema')
+    @patch('tap_postgres.sync_strategies.logical_replication.sync_common.send_schema_message')
+    def test_consume_message_raises_exception_if_delete_and_no_datatype_for_stream(self, *args):
+        """Test consume_message raises exception if kind is delete and could not a datatype for the stream"""
+        class msg:
+            data_start = 'foo_start'
+            payload = json.dumps({
+                'schema': 'foo',
+                'table': 'bar',
+                'kind': 'delete',
+                'columnnames': ['_sdc_deleted_at'],
+                'columnvalues': ['good'],
+                'oldkeys': {'keynames': ['foo_desired'], 'keyvalues': ['bar_value']}
+            })
+
+        streams = [{
+            'tap_stream_id': 'foo-bar',
+            'schema': {'properties': {'foo_desired': 'b'}},
+            'stream': 'test',
+            'metadata': [{'metadata': {'foo': 'test'}, 'breadcrumb': ["properties", "foo_desired"]}]
+        }]
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo'}}}
+        time_extracted = datetime(2020, 9, 1, 23, 10, 59, tzinfo=tzoffset(None, 0))
+        self.conn_info['debug_lsn'] = True
+        expected_message = f'Unable to find sql-datatype for stream {streams[0]}'
+        with self.assertRaises(Exception) as exp:
+            logical_replication.consume_message(streams, state, msg, time_extracted, self.conn_info)
+
+        self.assertEqual(expected_message, str(exp.exception))
+
+    @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
+    @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
+    @patch("psycopg2.connect")
+    def test_sync_tables_raises_exception_if_psycopg2_programming_error(self,
+                                                                        mocked_connect,
+                                                                        mocked_version,
+                                                                        mocked_locate_rep_slot):
+        """Test if sync_tables raises exception on psycopg2.ProgrammingError"""
+
+        mocked_start_replication = mocked_connect.return_value.cursor.return_value.start_replication
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo', 'lsn': 1}}}
+        end_lsn = 4
+        state_file = 5
+
+        test_replication_slot = 'foo_slot'
+        expected_message = 'Unable to start replication with logical replication' \
+                           f' (slot {test_replication_slot})'
+        mocked_version.return_value = 150000
+        mocked_start_replication.side_effect = psycopg2.ProgrammingError(test_replication_slot)
+        mocked_locate_rep_slot.return_value = test_replication_slot
+
+        with self.assertRaises(Exception) as exp:
+            logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
+        self.assertEqual(expected_message, str(exp.exception))
+
+    @patch('tap_postgres.sync_strategies.logical_replication.datetime.datetime')
+    @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
+    @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
+    @patch("psycopg2.connect")
+    def test_sync_tables_if_poll_duration_greater_than_logical_poll_total_seconds(self,
+                                                                                  mocked_connect,
+                                                                                  mocked_version,
+                                                                                  mocked_locate_rep_slot,
+                                                                                  mocked_datetime):
+        """Test sync_table works as expected if poll_duration greater than the logical_poll_total_seconds"""
+        test_poll_duration = 15
+
+        self.conn_info['max_run_seconds'] = test_poll_duration - 1
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo', 'lsn': 4}}}
+        end_lsn = 8
+        state_file = 5
+        rep_slot = 'foo_slot'
+        mocked_version.return_value = 150000
+        mocked_locate_rep_slot.return_value = rep_slot
+        mocked_datetime.utcnow().__sub__().total_seconds.return_value = test_poll_duration
+        mocked_start_replication = mocked_connect.return_value.cursor.return_value.start_replication
+
+        actual_output = logical_replication.sync_tables(self.conn_info,
+                                                        self.logical_streams,
+                                                        state, end_lsn, state_file)
+
+        self.assertDictEqual(state, actual_output)
+        mocked_start_replication.assert_called_with(
+            slot_name=rep_slot,
+            decode=True,
+            start_lsn=state['bookmarks']['foo-bar']['lsn'],
+            status_interval=10,
+            options={'write-in-chunks': 1, 'add-tables': 'schema_name_value.table_name_value'}
+        )
+
+    @patch('tap_postgres.sync_strategies.logical_replication.datetime.datetime')
+    @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
+    @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
+    @patch("psycopg2.connect")
+    def test_sync_tables_if_reached_max_run_seconds(self,
+                                                    mocked_connect,
+                                                    mocked_version,
+                                                    mocked_locate_rep_slot,
+                                                    mocked_datetime):
+        """Test sync_table if reached the max_run_seconds"""
+        mocked_datetime.utcnow.return_value = datetime(2022, 11, 11, 11, 11, 11, 11)
+        mocked_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+        self.conn_info['max_run_seconds'] = 0
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo', 'lsn': 4}}}
+        end_lsn = 4
+        state_file = 5
+        mocked_version.return_value = 150000
+        rep_slot = 'foo_slot'
+
+        mocked_start_replication = mocked_connect.return_value.cursor.return_value.start_replication
+        mocked_locate_rep_slot.return_value = rep_slot
+        actual_output = logical_replication.sync_tables(self.conn_info,
+                                                        self.logical_streams,
+                                                        state, end_lsn, state_file)
+
+        self.assertDictEqual(state, actual_output)
+        mocked_start_replication.assert_called_with(
+            slot_name=rep_slot,
+            decode=True,
+            start_lsn=state['bookmarks']['foo-bar']['lsn'],
+            status_interval=10,
+            options={'write-in-chunks': 1, 'add-tables': 'schema_name_value.table_name_value'}
+        )
+
+    @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
+    @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
+    @patch("psycopg2.connect")
+    def test_sync_tables_raise_exception_if_error_in_message_read(self,
+                                                                  mocked_connect,
+                                                                  mocked_version,
+                                                                  _):
+        """Test sync_tables raises exception if error in the message_read"""
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'lsn': 4}}}
+        end_lsn = 8
+        state_file = 5
+
+        mocked_version.return_value = 150000
+        expected_message = 'FOO'
+        mocked_connect.return_value.cursor.return_value.read_message.side_effect = Exception(expected_message)
+
+        with self.assertRaises(Exception) as exp:
+            logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
+        self.assertEqual(expected_message, str(exp.exception))
+
+    @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
+    @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
+    @patch("psycopg2.connect")
+    def test_sync_tables_if_break_at_end_lsn_and_msg_data_start_greater_than_end_lsn(self,
+                                                                                     mocked_connect,
+                                                                                     mocked_version,
+                                                                                     mocked_locate_rep_slot):
+        """Test sync_table if there is break_at_the_end_lsn and message  data_start greater than lsn"""
+        end_lsn = 4
+        msg_data_start = end_lsn + 1
+
+        class test_message:
+            data_start = msg_data_start
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo', 'lsn': 15}}}
+        self.conn_info['break_at_end_lsn'] = True
+        state_file = 5
+
+        mocked_version.return_value = 150000
+
+        mocked_connect.return_value.cursor.return_value.read_message.return_value = test_message()
+
+        mocked_locate_rep_slot.return_value = 'mocked_value_for_replication_slot'
+        expected_log_message = 'INFO:tap_postgres:Breaking - latest wal message ' \
+                               f'{logical_replication.int_to_lsn(msg_data_start)} is' \
+                               f' past end_lsn {logical_replication.int_to_lsn(end_lsn)}'
+        with self.assertLogs() as captured_log:
+            actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
+            self.assertIn(expected_log_message, captured_log.output)
+            self.assertEqual(state, actual_output)
+
+    @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
+    @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
+    @patch('tap_postgres.sync_strategies.logical_replication.select')
+    @patch("psycopg2.connect")
+    def test_sync_tables_if_no_message_and_raised_interrupted_error(self,
+                                                                    mocked_connect,
+                                                                    mocked_select,
+                                                                    mocked_version,
+                                                                    mocked_locate_rep_slot):
+        """Test sync_tables if there is no message and InterruptedError is raised"""
+        end_lsn = 4
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo', 'lsn': 15}}}
+
+        state_file = 5
+
+        mocked_select.side_effect = InterruptedError()
+        mocked_version.return_value = 150000
+        mocked_connect.return_value.cursor.return_value.read_message.return_value = None
+        mocked_locate_rep_slot.return_value = 'mocked_value_for_replication_slot'
+
+        actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
+        self.assertEqual(state, actual_output)
+
+    @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
+    @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
+    @patch("psycopg2.connect")
+    def test_sync_tables_if_msg_and_some_specific_cases_for_lsn(self,
+                                                                mocked_connect,
+                                                                mocked_version,
+                                                                mocked_locate_rep_slot):
+        """Test sync_table if there is message and lsn_currently_processing is None
+         and lsn_currently_processing is less than lsn_to_flush"""
+        end_lsn = 7
+        lsn_committed = 15
+
+        class test_message:
+            data_start = end_lsn + 1
+
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo', 'lsn': lsn_committed}}}
+        self.conn_info['break_at_end_lsn'] = False
+        state_file = 55
+
+        mocked_version.return_value = 150000
+
+        mocked_connect.return_value.cursor.return_value.read_message.return_value = test_message()
+
+        mocked_locate_rep_slot.return_value = 'mocked_value_for_replication_slot'
+        actual_output = logical_replication.sync_tables(self.conn_info,
+                                                        self.logical_streams,
+                                                        state, end_lsn, state_file)
+
+        self.assertEqual(state, actual_output)
+        mocked_send_feedback = mocked_connect.return_value.cursor.return_value.send_feedback
+        mocked_send_feedback.assert_called_with(write_lsn=test_message.data_start,
+                                                flush_lsn=test_message.data_start,
+                                                reply=True, force=True)
