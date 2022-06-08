@@ -159,6 +159,22 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):
             cleaned_elem = elem
         else:
             raise Exception(f"do not know how to marshall a dict if its not an hstore or json: {sql_datatype}")
+    elif 'range' in sql_datatype:
+        child_type = {
+            'int4range': 'int4',
+            'int8range': 'int8',
+            'numrange': 'numeric',
+            'tsrange': 'timestamp without time zone',
+            'tstzrange': 'timestamp with time zone',
+            'daterange': 'date',
+        }.get(sql_datatype, None)
+        if child_type is None:
+            raise Exception(f"do not know how to marshall a range of type {sql_datatype}")
+        cleaned_elem = {
+            'lower': selected_value_to_singer_value_impl(elem.lower, child_type),
+            'upper': selected_value_to_singer_value_impl(elem.upper, child_type),
+            'bounds': elem._bounds,
+        }
     else:
         raise Exception(
             f"do not know how to marshall value of class( {elem.__class__} ) and sql_datatype ( {sql_datatype} )")

@@ -348,6 +348,72 @@ class TestJsonTables(unittest.TestCase):
                           'type': 'object'},
                          stream_dict.get('schema'))
 
+class TestRangeTables(unittest.TestCase):
+    maxDiff = None
+    table_name = 'CHICKEN TIMES'
+
+    def setUp(self):
+        table_spec = {"columns": [{"name": 'our_int_range', "type": "int4range"},
+                                  {"name": 'our_tstz_range', "type": "tstzrange"}],
+                      "name": TestRangeTables.table_name}
+        ensure_test_table(table_spec)
+
+    def test_catalog(self):
+        conn_config = get_test_connection_config()
+
+        my_stdout = io.StringIO()
+        with contextlib.redirect_stdout(my_stdout):
+            streams = tap_postgres.do_discovery(conn_config)
+
+        chicken_streams = [s for s in streams if s['tap_stream_id'] == 'public-CHICKEN TIMES']
+        self.assertEqual(len(chicken_streams), 1)
+        stream_dict = chicken_streams[0]
+
+        stream_dict.get('metadata').sort(key=lambda md: md['breadcrumb'])
+
+        self.assertEqual(metadata.to_map(stream_dict.get('metadata')),
+                         {(): {'database-name': 'postgres',
+                               'is-view': False,
+                               'row-count': 0,
+                               'schema-name': 'public',
+                               'table-key-properties': []},
+                          ('properties', 'our_int_range'): {'inclusion': 'available',
+                                                            'selected-by-default': True,
+                                                            'sql-datatype': 'int4range'},
+                          ('properties', 'our_tstz_range'): {'inclusion': 'available',
+                                                             'selected-by-default': True,
+                                                             'sql-datatype': 'tstzrange'}})
+
+        self.assertEqual(stream_dict.get('schema'),
+                         {'definitions': {'sdc_recursive_boolean_array': {'items': {'$ref': '#/definitions/sdc_recursive_boolean_array'},
+                                                                          'type': ['null',
+                                                                                   'boolean',
+                                                                                   'array']},
+                                          'sdc_recursive_integer_array': {'items': {'$ref': '#/definitions/sdc_recursive_integer_array'},
+                                                                          'type': ['null',
+                                                                                   'integer',
+                                                                                   'array']},
+                                          'sdc_recursive_number_array': {'items': {'$ref': '#/definitions/sdc_recursive_number_array'},
+                                                                         'type': ['null',
+                                                                                  'number',
+                                                                                  'array']},
+                                          'sdc_recursive_object_array': {'items': {'$ref': '#/definitions/sdc_recursive_object_array'},
+                                                                         'type': ['null',
+                                                                                  'object',
+                                                                                  'array']},
+                                          'sdc_recursive_string_array': {'items': {'$ref': '#/definitions/sdc_recursive_string_array'},
+                                                                         'type': ['null',
+                                                                                  'string',
+                                                                                  'array']},
+                                          'sdc_recursive_timestamp_array': {'format': 'date-time',
+                                                                            'items': {'$ref': '#/definitions/sdc_recursive_timestamp_array'},
+                                                                            'type': ['null',
+                                                                                     'string',
+                                                                                     'array']}},
+                          'properties': {'our_int_range': {'type': ['null', 'object']},
+                                         'our_tstz_range': {'type': ['null', 'object']}},
+                          'type': 'object'})
+
 
 class TestUUIDTables(unittest.TestCase):
     maxDiff = None

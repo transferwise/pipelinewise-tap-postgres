@@ -2,7 +2,7 @@ import decimal
 import unittest
 
 import datetime
-
+import psycopg2.extras
 from tap_postgres import db
 
 
@@ -170,6 +170,17 @@ class TestDbFunctions(unittest.TestCase):
             'key1': 'A',
             'key2': [{'kk': 'yo'}, {}]
         }, output)
+
+    def test_selected_value_to_singer_value_impl_with_intrange(self):
+        output = db.selected_value_to_singer_value_impl(psycopg2.extras.NumericRange(1,4,'[)'), 'int4range')
+
+        self.assertEqual({'lower': 1, 'upper': 4, 'bounds': '[)'}, output)
+
+    def test_selected_value_to_singer_value_impl_with_tstzrange(self):
+        output = db.selected_value_to_singer_value_impl(psycopg2.extras.DateTimeTZRange(datetime.datetime(2020,1,2,3,4,5,tzinfo=datetime.timezone.utc),None,'[)'), 'tstzrange')
+
+        self.assertEqual({'lower': '2020-01-02T03:04:05+00:00', 'upper': None, 'bounds': '[)'}, output)
+
 
     def test_fully_qualified_column_name(self):
         schema = 'foo_schema'
