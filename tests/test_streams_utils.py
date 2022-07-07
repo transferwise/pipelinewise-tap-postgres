@@ -29,7 +29,8 @@ class TestInit(unittest.TestCase):
 								  {"name": '"character-varying_name"', "type": "character varying"},
 								  {"name": '"varchar-name"', "type": "varchar(28)"},
 								  {"name": 'char_name', "type": "char(10)"},
-								  {"name": '"text-name"', "type": "text"}],
+								  {"name": '"text-name"', "type": "text"},
+								  {"name": '"column_to_exclude-name"', "type": "text"}],
 					  "name": self.table_name}
 
 		ensure_test_table(table_spec)
@@ -51,6 +52,10 @@ class TestInit(unittest.TestCase):
 							'table-key-properties': ['some_id'],
 							'row-count': 1000,
 						}
+					},
+					{
+						'breadcrumb': ['properties', 'column_to_exclude-name'],
+						'metadata': {'selected': False}
 					}
 				]
 			}
@@ -75,6 +80,10 @@ class TestInit(unittest.TestCase):
 			('properties', 'character-varying_name'): {'inclusion': 'available',
 													   'sql-datatype': 'character varying',
 													   'selected-by-default': True},
+		    ('properties', 'column_to_exclude-name'): {'inclusion': 'available',
+		                                               'selected': False,
+		                                               'selected-by-default': True,
+		                                               'sql-datatype': 'text'},
 			('properties', 'id'): {'inclusion': 'automatic',
 								   'sql-datatype': 'integer',
 								   'selected-by-default': True},
@@ -94,6 +103,7 @@ class TestInit(unittest.TestCase):
 										 'character-varying_name': {'type': ['null', 'string']},
 										 'varchar-name': {'type': ['null', 'string'], 'maxLength': 28},
 										 'char_name': {'type': ['null', 'string'], 'maxLength': 10},
-										 'text-name': {'type': ['null', 'string']}},
+										 'text-name': {'type': ['null', 'string']},
+										 'column_to_exclude-name': {'type': ['null', 'string']}},
 						  'type': 'object',
 						  'definitions': BASE_RECURSIVE_SCHEMAS}, streams[0].get('schema'))
