@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "pipelinewise-tap-postgres"
+version = "1.8.1"
+description = ""
+authors = ["Your Name <you@example.com>"]
+license = "AGPLv3"
+
+packages = [
+    { include = "tap_postgres" },
+]
+
+[tool.poetry.scripts]
+tap-postgres = 'tap_postgres:main'
+
+[tool.poetry.dependencies]
+python = ">=3.7,<3.11"
+pipelinewise-singer-python = "^1"
+psycopg2-binary = "~2.8.6"
+strict-rfc3339 = "0.7"
+
+[tool.poetry.dev-dependencies]
+pytest = "~6.2.5"
+pylint = "~2.10.2"
+pytest-cov = "~2.12.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
