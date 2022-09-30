@@ -61,42 +61,44 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
     hstore_available = post_db.hstore_available(conn_info)
     with metrics.record_counter(None) as counter:
-        with post_db.open_connection(conn_info) as conn:
+        LOGGER.info("Beginning new incremental replication sync %s", stream_version)
 
-            # Client side character encoding defaults to the value in postgresql.conf under client_encoding.
-            # The server / db can also have its own configred encoding.
-            with conn.cursor() as cur:
-                cur.execute("show server_encoding")
-                LOGGER.info("Current Server Encoding: %s", cur.fetchone()[0])
-                cur.execute("show client_encoding")
-                LOGGER.info("Current Client Encoding: %s", cur.fetchone()[0])
+        # Using a limit in the query because long running operations against a read-replica is a bad idea
+        limit = post_db.CURSOR_ITER_SIZE
+        rows_saved = 0
+        done = False
+        singlepage = conn_info.get('singlepage', "no") == "yes"
 
-            if hstore_available:
-                LOGGER.info("hstore is available")
-                psycopg2.extras.register_hstore(conn)
-            else:
-                LOGGER.info("hstore is UNavailable")
+        if replication_key_value:
+            base_select_sql = f"""SELECT {','.join(escaped_columns)}
+                            FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+                            WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
+                            ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
+        else:
+            #if not replication_key_value
+            base_select_sql = f"""SELECT {','.join(escaped_columns)}
+                            FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+                            ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
 
-            LOGGER.info("Beginning new incremental replication sync %s", stream_version)
 
-            # Using a limit in the query because long running operations against a read-replica is a bad idea
-            limit = post_db.CURSOR_ITER_SIZE
-            rows_saved = 0
-            done = False
-            singlepage = conn_info.get('singlepage', "no") == "yes"
+        while not done:
+            # A connection is the object which holds the transaction
+            with post_db.open_connection(conn_info) as conn:
 
-            if replication_key_value:
-                base_select_sql = f"""SELECT {','.join(escaped_columns)}
-                                FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-                                WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
-                                ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
-            else:
-                #if not replication_key_value
-                base_select_sql = f"""SELECT {','.join(escaped_columns)}
-                                FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-                                ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
+                # Client side character encoding defaults to the value in postgresql.conf under client_encoding.
+                # The server / db can also have its own configred encoding.
+                with conn.cursor() as cur:
+                    cur.execute("show server_encoding")
+                    LOGGER.info("Current Server Encoding: %s", cur.fetchone()[0])
+                    cur.execute("show client_encoding")
+                    LOGGER.info("Current Client Encoding: %s", cur.fetchone()[0])
 
-            while not done:
+                if hstore_available:
+                    LOGGER.info("hstore is available")
+                    psycopg2.extras.register_hstore(conn)
+                else:
+                    LOGGER.info("hstore is UNavailable")
+
                 with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
                     cur.itersize = post_db.CURSOR_ITER_SIZE
 
