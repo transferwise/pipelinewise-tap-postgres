@@ -413,8 +413,6 @@ def main_impl():
 
     post_db.CURSOR_ITER_SIZE = int(args.config.get('itersize', post_db.CURSOR_ITER_SIZE))
 
-    conn_config['singlepage'] = args.config.get('singlepage', 'no')
-
     if args.discover:
         do_discovery(conn_config)
     elif args.properties or args.catalog:

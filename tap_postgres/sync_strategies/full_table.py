@@ -121,65 +121,45 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
             else:
                 LOGGER.info("hstore is UNavailable")
 
-            # Using a limit in the query because long running operations against a read-replica is a bad idea
-            limit = post_db.CURSOR_ITER_SIZE
-            rows_saved = 0
-            done = False
-            singlepage = conn_info.get('singlepage', "no") == "yes"
+            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
+                cur.itersize = post_db.CURSOR_ITER_SIZE
 
-            fq_table_name = post_db.fully_qualified_table_name(schema_name, stream['table_name'])
-            xmin = singer.get_bookmark(state, stream['tap_stream_id'], 'xmin')
+                fq_table_name = post_db.fully_qualified_table_name(schema_name, stream['table_name'])
+                xmin = singer.get_bookmark(state, stream['tap_stream_id'], 'xmin')
+                if xmin:
+                    LOGGER.info("Resuming Full Table replication %s from xmin %s", nascent_stream_version, xmin)
+                    select_sql = """SELECT {}, xmin::text::bigint
+                                      FROM {} where age(xmin::xid) <= age('{}'::xid)
+                                     ORDER BY xmin::text ASC""".format(','.join(escaped_columns),
+                                                                       fq_table_name,
+                                                                       xmin)
+                else:
+                    LOGGER.info("Beginning new Full Table replication %s", nascent_stream_version)
+                    select_sql = """SELECT {}, xmin::text::bigint
+                                      FROM {}
+                                     ORDER BY xmin::text ASC""".format(','.join(escaped_columns),
+                                                                       fq_table_name)
 
-            if xmin:
-                LOGGER.info("Resuming Full Table replication %s from xmin %s", nascent_stream_version, xmin)
-                base_select_sql = f"""SELECT {','.join(escaped_columns)}, xmin::text::bigint
-                                    FROM {fq_table_name} where age(xmin::xid) <= age('{xmin}'::xid)
-                                    ORDER BY xmin::text ASC
-                                    LIMIT {limit}
-                                    OFFSET {rows_saved}"""
-            else:
-                LOGGER.info("Beginning new Full Table replication %s", nascent_stream_version)
-                base_select_sql = f"""SELECT {','.join(escaped_columns)}, xmin::text::bigint
-                                    FROM {fq_table_name}
-                                    ORDER BY xmin::text ASC
-                                    LIMIT {limit}
-                                    OFFSET {rows_saved}"""
+                LOGGER.info("select %s with itersize %s", select_sql, cur.itersize)
+                cur.execute(select_sql)
 
-            while not done:
-                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
-                    cur.itersize = post_db.CURSOR_ITER_SIZE
+                rows_saved = 0
+                for rec in cur:
+                    xmin = rec['xmin']
+                    rec = rec[:-1]
+                    record_message = post_db.selected_row_to_singer_message(stream,
+                                                                            rec,
+                                                                            nascent_stream_version,
+                                                                            desired_columns,
+                                                                            time_extracted,
+                                                                            md_map)
+                    singer.write_message(record_message)
+                    state = singer.write_bookmark(state, stream['tap_stream_id'], 'xmin', xmin)
+                    rows_saved = rows_saved + 1
+                    if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
+                        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
-                    select_sql = f"""{base_select_sql}
-                                    LIMIT {limit}
-                                    OFFSET {rows_saved}"""
-
-                    LOGGER.info("select %s with itersize %s", select_sql, cur.itersize)
-                    cur.execute(select_sql)
-
-                    # Rowcount may be bad value for various reasons so rely on the iteration
-                    records_read = 0
-
-                    for rec in cur:
-                        xmin = rec['xmin']
-                        rec = rec[:-1]
-                        record_message = post_db.selected_row_to_singer_message(stream,
-                                                                                rec,
-                                                                                nascent_stream_version,
-                                                                                desired_columns,
-                                                                                time_extracted,
-                                                                                md_map)
-                        singer.write_message(record_message)
-                        state = singer.write_bookmark(state, stream['tap_stream_id'], 'xmin', xmin)
-                        rows_saved = rows_saved + 1
-                        if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
-                            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-
-                        counter.increment()
-                        records_read += 1
-
-                    if singlepage or records_read < limit:
-                        # We are done
-                        done = True
+                    counter.increment()
 
     # once we have completed the full table replication, discard the xmin bookmark.
     # the xmin bookmark only comes into play when a full table replication is interrupted
