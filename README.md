@@ -108,7 +108,7 @@ for more information.
 ### Run the tap in Sync Mode
 
 ```
-tap-postgres --config config.json --properties catalog.json
+tap-postgres --config config.json --catalog catalog.json
 ```
 
 The tap will write bookmarks to stdout which can be captured and passed as an optional `--state state.json` parameter
