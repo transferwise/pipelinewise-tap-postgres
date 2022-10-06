@@ -1,3 +1,8 @@
+1.8.4 (2022-09-08)
+-------------------
+**Changes**
+- INCREMENTAL: Use sub-query to trick PostreSQL into more efficient use of index.
+
 1.8.3 (2022-01-18)
 -------------------
 **Fixes**
@@ -48,7 +53,7 @@
 Fix data loss issue when running `LOG_BASED` due to the tap not sending new SCHEMA singer messages when source tables change structure, mainly new/renamed columns, which causes the target to not be up to date with the stream structure.
 The tap now:
 * Runs discovery for selected stream at the beginning of sync to send up to date SCHEMA singer messages
-* When new columns are detected in WAL payloads, then run discovery for the stream and send new SCHEMA message. 
+* When new columns are detected in WAL payloads, then run discovery for the stream and send new SCHEMA message.
 
 1.6.2 (2020-05-18)
 -------------------

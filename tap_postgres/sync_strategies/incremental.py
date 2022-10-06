@@ -129,13 +129,17 @@ def _get_select_sql(params):
     stream = params['stream']
     if replication_key_value:
         select_sql = f"""
-    SELECT {','.join(escaped_columns)}
-    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-    WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
-    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
+        SELECT {','.join(escaped_columns)}
+        FROM (
+            SELECT *
+            FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+            WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
+            ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC
+        ) pg_speedup_trick"""
     else:
         # if not replication_key_value
-        select_sql = f"""SELECT {','.join(escaped_columns)}
-                                    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-                                    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
+        select_sql = f"""
+        SELECT {','.join(escaped_columns)}
+        FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+        """
     return select_sql
