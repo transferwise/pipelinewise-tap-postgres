@@ -77,7 +77,8 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
     # For every stream, update the schema and metadata from the corresponding discovered stream
     for idx, stream in enumerate(streams):
         discovered_stream = new_discovery[stream['tap_stream_id']]
-        streams[idx]['schema'] = _merge_stream_schema(stream, discovered_stream)
+        if not stream['schema']['properties']:
+            streams[idx]['schema'] = _merge_stream_schema(stream, discovered_stream)
         streams[idx]['metadata'] = _merge_stream_metadata(stream, discovered_stream)
 
     LOGGER.debug('Updated streams schemas %s', streams)
@@ -90,11 +91,9 @@ def _merge_stream_schema(stream, discovered_stream):
     """
     discovered_schema = copy.deepcopy(discovered_stream['schema'])
 
-    for column, column_schema in stream['schema']['properties'].items():
-        if column in discovered_schema['properties'] and column_schema != discovered_schema['properties'][column]:
-            override = copy.deepcopy(stream['schema']['properties'][column])
-            LOGGER.info('Overriding schema for %s.%s with %s', stream['tap_stream_id'], column, override)
-            discovered_schema['properties'][column].update(override)
+    override = copy.deepcopy(stream['schema']['properties'])
+    LOGGER.info('Overriding schema for %s with %s', stream['tap_stream_id'], override)
+    discovered_schema['properties'].update(override)
 
     return discovered_schema
 
