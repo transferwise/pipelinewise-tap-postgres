@@ -77,25 +77,15 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
     # For every stream, update the schema and metadata from the corresponding discovered stream
     for idx, stream in enumerate(streams):
         discovered_stream = new_discovery[stream['tap_stream_id']]
+        
         if not stream.get('schema', {}).get('properties'):
-            streams[idx]['schema'] = _merge_stream_schema(stream, discovered_stream)
+            discovered_schema = copy.deepcopy(discovered_stream['schema'])
+            LOGGER.info('Overriding schema for %s with %s', stream['tap_stream_id'], discovered_schema)
+            streams[idx]['schema'] = discovered_schema
+            
         streams[idx]['metadata'] = _merge_stream_metadata(stream, discovered_stream)
 
     LOGGER.debug('Updated streams schemas %s', streams)
-
-
-def _merge_stream_schema(stream, discovered_stream):
-    """
-    A discovered stream doesn't include any schema overrides from the catalog
-    file. Merges overrides from the catalog file into the discovered schema.
-    """
-    discovered_schema = copy.deepcopy(discovered_stream['schema'])
-
-    override = copy.deepcopy(stream['schema']['properties'])
-    LOGGER.info('Overriding schema for %s with %s', stream['tap_stream_id'], override)
-    discovered_schema['properties'].update(override)
-
-    return discovered_schema
 
 
 def _merge_stream_metadata(stream, discovered_stream):
