@@ -77,7 +77,7 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
     # For every stream, update the schema and metadata from the corresponding discovered stream
     for idx, stream in enumerate(streams):
         discovered_stream = new_discovery[stream['tap_stream_id']]
-        if not stream['schema']['properties']:
+        if not stream.get('schema', {}).get('properties'):
             streams[idx]['schema'] = _merge_stream_schema(stream, discovered_stream)
         streams[idx]['metadata'] = _merge_stream_metadata(stream, discovered_stream)
 
