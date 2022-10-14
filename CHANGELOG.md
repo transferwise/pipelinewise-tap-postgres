@@ -1,3 +1,25 @@
+1.8.4 (2022-09-08)
+-------------------
+**Changes**
+- INCREMENTAL: Use sub-query to trick PostreSQL into more efficient use of index.
+
+1.8.3 (2022-01-18)
+-------------------
+**Fixes**
+- INCREMENTAL: generate valid SQL to extract data from tables where no `replication_key_value` in the state file.
+
+1.8.2 (2022-01-14)
+-------------------
+**Fixes**
+- LOG_BASED: catch exceptions and emit current state upon exiting
+- LOG_BASED: `max_run_seconds` only working when there are wal messages.
+- LOG_BASED: Prevent high CPU utilization while waiting for wal messages.
+
+**Changes**
+- local database container for dev and test purposes.
+- bump `psycopg2-binary` from `2.8.6` to `2.9.3`
+
+
 1.8.1 (2021-09-23)
 -------------------
 **Fixes**
@@ -31,7 +53,7 @@
 Fix data loss issue when running `LOG_BASED` due to the tap not sending new SCHEMA singer messages when source tables change structure, mainly new/renamed columns, which causes the target to not be up to date with the stream structure.
 The tap now:
 * Runs discovery for selected stream at the beginning of sync to send up to date SCHEMA singer messages
-* When new columns are detected in WAL payloads, then run discovery for the stream and send new SCHEMA message. 
+* When new columns are detected in WAL payloads, then run discovery for the stream and send new SCHEMA message.
 
 1.6.2 (2020-05-18)
 -------------------

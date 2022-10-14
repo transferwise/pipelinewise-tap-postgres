@@ -18,7 +18,7 @@ CURSOR_ITER_SIZE = 20000
 
 # pylint: disable=invalid-name,missing-function-docstring
 def calculate_destination_stream_name(stream, md_map):
-    return "{}-{}".format(md_map.get((), {}).get('schema-name'), stream['stream'])
+    return f"{md_map.get((), {}).get('schema-name')}-{stream['stream']}"
 
 
 # from the postgres docs:
@@ -29,16 +29,14 @@ def canonicalize_identifier(identifier):
 
 
 def fully_qualified_column_name(schema, table, column):
-    return '"{}"."{}"."{}"'.format(canonicalize_identifier(schema),
-                                   canonicalize_identifier(table),
-                                   canonicalize_identifier(column))
+    return f'"{canonicalize_identifier(schema)}"."{canonicalize_identifier(table)}"."{canonicalize_identifier(column)}"'
 
 
 def fully_qualified_table_name(schema, table):
-    return '"{}"."{}"'.format(canonicalize_identifier(schema), canonicalize_identifier(table))
+    return f'"{canonicalize_identifier(schema)}"."{canonicalize_identifier(table)}"'
 
 
-def open_connection(conn_config, logical_replication=False):
+def open_connection(conn_config, logical_replication=False, prioritize_primary=False):
     cfg = {
         'application_name': 'pipelinewise',
         'host': conn_config['host'],
@@ -48,6 +46,14 @@ def open_connection(conn_config, logical_replication=False):
         'port': conn_config['port'],
         'connect_timeout': 30
     }
+
+    if conn_config['use_secondary'] and not prioritize_primary and not logical_replication:
+        # Try to use replica but fallback to primary if keys are missing. This is the same behavior as
+        # https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/fastsync/commons/tap_postgres.py#L129
+        cfg.update({
+            'host': conn_config.get("secondary_host", conn_config['host']),
+            'port': conn_config.get("secondary_port", conn_config['port']),
+        })
 
     if conn_config.get('sslmode'):
         cfg['sslmode'] = conn_config['sslmode']
@@ -60,7 +66,7 @@ def open_connection(conn_config, logical_replication=False):
     return conn
 
 def prepare_columns_for_select_sql(c, md_map):
-    column_name = ' "{}" '.format(canonicalize_identifier(c))
+    column_name = f' "{canonicalize_identifier(c)}" '
 
     if ('properties', c) in md_map:
         sql_datatype = md_map[('properties', c)]['sql-datatype']
@@ -73,17 +79,17 @@ def prepare_columns_for_select_sql(c, md_map):
     return column_name
 
 def prepare_columns_sql(c):
-    column_name = """ "{}" """.format(canonicalize_identifier(c))
+    column_name = f""" "{canonicalize_identifier(c)}" """
     return column_name
 
 
 def filter_dbs_sql_clause(sql, filter_dbs):
-    in_clause = " AND datname in (" + ",".join(["'{}'".format(b.strip(' ')) for b in filter_dbs.split(',')]) + ")"
+    in_clause = " AND datname in (" + ",".join([f"'{b.strip(' ')}'" for b in filter_dbs.split(',')]) + ")"
     return sql + in_clause
 
 
 def filter_schemas_sql_clause(sql, filer_schemas):
-    in_clause = " AND n.nspname in (" + ",".join(["'{}'".format(b.strip(' ')) for b in filer_schemas.split(',')]) + ")"
+    in_clause = " AND n.nspname in (" + ",".join([f"'{b.strip(' ')}'" for b in filer_schemas.split(',')]) + ")"
     return sql + in_clause
 
 
@@ -152,11 +158,10 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):
         if sql_datatype == 'hstore':
             cleaned_elem = elem
         else:
-            raise Exception("do not know how to marshall a dict if its not an hstore or json: {}".format(sql_datatype))
+            raise Exception(f"do not know how to marshall a dict if its not an hstore or json: {sql_datatype}")
     else:
         raise Exception(
-            "do not know how to marshall value of class( {} ) and sql_datatype ( {} )".format(elem.__class__,
-                                                                                              sql_datatype))
+            f"do not know how to marshall value of class( {elem.__class__} ) and sql_datatype ( {sql_datatype} )")
 
     return cleaned_elem
 
@@ -249,7 +254,7 @@ def numeric_min(precision, scale):
 
 
 def filter_tables_sql_clause(sql, tables: List[str]):
-    in_clause = " AND pg_class.relname in (" + ",".join(["'{}'".format(b.strip(' ')) for b in tables]) + ")"
+    in_clause = " AND pg_class.relname in (" + ",".join([f"'{b.strip(' ')}'" for b in tables]) + ")"
     return sql + in_clause
 
 def get_database_name(connection):

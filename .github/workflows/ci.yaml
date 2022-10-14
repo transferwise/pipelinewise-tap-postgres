@@ -13,21 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ 3.6, 3.7, 3.8 ]
-
-    services:
-      test_postgres:
-        image: postgres:12
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: my-secret-passwd
-          POSTGRES_DB: tap_postgres_test
-        ports:
-          - 5432:5432
+        python-version: [ 3.6, 3.7, 3.8, 3.9 ]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+
+      - name: Build PG DB container
+        run: make start_db
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
@@ -42,9 +35,11 @@ jobs:
 
       - name: Tests
         env:
+          TAP_POSTGRES_HOST: localhost
           TAP_POSTGRES_PORT: 5432
           TAP_POSTGRES_USER: test_user
           TAP_POSTGRES_PASSWORD: my-secret-passwd
-          TAP_POSTGRES_HOST: localhost
+          TAP_POSTGRES_SECONDARY_HOST: localhost
+          TAP_POSTGRES_SECONDARY_PORT: 5433
           LOGGING_CONF_FILE: ./sample_logging.conf
         run: make test

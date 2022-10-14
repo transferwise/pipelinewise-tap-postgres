@@ -31,10 +31,7 @@ It's recommended to use a virtualenv:
 or
 
 ```bash
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .
+  make venv
 ```
 
 ### Create a config.json
@@ -69,6 +66,9 @@ Full list of options in `config.json`:
 | tap_id                              | String  | No         | ID of the pipeline/tap (Default: None) |
 | itersize                            | Integer | No         | Size of PG cursor iterator when doing INCREMENTAL or FULL_TABLE  (Default: 20000) |
 | default_replication_method          | String  | No         | Default replication method to use when no one is provided in the catalog (Values: `LOG_BASED`, `INCREMENTAL` or `FULL_TABLE`)  (Default: None) |
+| use_secondary                       | Boolean | No         | Use a database replica for `INCREMENTAL` and `FULL_TABLE` replication (Default : False) |
+| secondary_host                      | String  | No         | PostgreSQL Replica host (required if `use_secondary` is `True`) |
+| secondary_port                      | Integer | No         | PostgreSQL Replica port (required if `use_secondary` is `True`) |
 
 
 ### Run the tap in Discovery Mode
@@ -107,7 +107,7 @@ for more information.
 ### Run the tap in Sync Mode
 
 ```
-tap-postgres --config config.json --properties catalog.json
+tap-postgres --config config.json --catalog catalog.json
 ```
 
 The tap will write bookmarks to stdout which can be captured and passed as an optional `--state state.json` parameter
@@ -145,7 +145,7 @@ to the tap for the next sync.
     ```
 
     Restart your PostgreSQL service to ensure the changes take effect.
-  
+
     **Note**: For `max_replication_slots` and `max_wal_senders`, we’re defaulting to a value of 5.
     This should be sufficient unless you have a large number of read replicas connected to the master instance.
 
@@ -154,11 +154,11 @@ to the tap for the next sync.
   In PostgreSQL, a logical replication slot represents a stream of database changes that can then be replayed to a
   client in the order they were made on the original server. Each slot streams a sequence of changes from a single
   database.
-  
+
   Login to the master instance as a superuser and using the `wal2json` plugin, create a logical replication slot:
   ```
     SELECT *
-    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');  
+    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');
   ```
 
   **Note**: Replication slots are specific to a given database in a cluster. If you want to connect multiple
@@ -168,19 +168,20 @@ to the tap for the next sync.
 
 1. Install python test dependencies in a virtual env:
 ```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .[test]
+ make venv
 ```
 
 2. You need to have a postgres database to run the tests and export its credentials:
 ```
   export TAP_POSTGRES_HOST=<postgres-host>
   export TAP_POSTGRES_PORT=<postgres-port>
+  export TAP_POSTGRES_SECONDARY_HOST=<postgres-replica-host>
+  export TAP_POSTGRES_SECONDARY_PORT=<postgres-replica-port>
   export TAP_POSTGRES_USER=<postgres-user>
   export TAP_POSTGRES_PASSWORD=<postgres-password>
 ```
+
+You can make use of the local docker-compose to spin up a test database by running `make start_db`
 
 Test objects will be created in the `postgres` database.
 
@@ -193,11 +194,6 @@ Test objects will be created in the `postgres` database.
 
 1. Install python dependencies and run python linter
 ```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .[test]
+  make venv
   make pylint
 ```
-
----

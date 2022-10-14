@@ -78,7 +78,7 @@ def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
     illegal_bk_keys = set(stream_state.keys()).difference(
         {'replication_key', 'replication_key_value', 'version', 'last_replication_method'})
     if len(illegal_bk_keys) != 0:
-        raise Exception("invalid keys found in state: {}".format(illegal_bk_keys))
+        raise Exception(f"invalid keys found in state: {illegal_bk_keys}")
 
     state = singer.write_bookmark(state, stream['tap_stream_id'], 'replication_key', replication_key)
 
@@ -104,7 +104,7 @@ def sync_method_for_streams(streams, state, default_replication_method):
         state = clear_state_on_replication_change(state, stream['tap_stream_id'], replication_key, replication_method)
 
         if replication_method not in {'LOG_BASED', 'FULL_TABLE', 'INCREMENTAL'}:
-            raise Exception("Unrecognized replication_method {}".format(replication_method))
+            raise Exception(f"Unrecognized replication_method {replication_method}")
 
         md_map = metadata.to_map(stream['metadata'])
         desired_columns = [c for c in stream['schema']['properties'].keys() if
@@ -187,7 +187,7 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
         sync_common.send_schema_message(stream, [])
         state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
     else:
-        raise Exception("unknown sync method {} for stream {}".format(sync_method, stream['tap_stream_id']))
+        raise Exception(f"unknown sync method {sync_method} for stream {stream['tap_stream_id']}")
 
     state = singer.set_currently_syncing(state, None)
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
@@ -209,7 +209,7 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
         # This is to avoid sending very old starting and flushing positions to source
         selected_streams = set()
         for stream in logical_streams:
-            selected_streams.add("{}".format(stream['tap_stream_id']))
+            selected_streams.add(stream['tap_stream_id'])
 
         new_state = dict(currently_syncing=state['currently_syncing'], bookmarks={})
 
@@ -269,7 +269,7 @@ def register_type_adapters(conn_config):
                 enum_oid = oid[0]
                 psycopg2.extensions.register_type(
                     psycopg2.extensions.new_array_type(
-                        (enum_oid,), 'ENUM_{}[]'.format(enum_oid), psycopg2.STRING))
+                        (enum_oid,), f'ENUM_{enum_oid}[]', psycopg2.STRING))
 
 
 def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
@@ -405,8 +405,21 @@ def main_impl():
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
-        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0))
+        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
+        'use_secondary': args.config.get('use_secondary', False),
     }
+
+    if conn_config['use_secondary']:
+        try:
+            conn_config.update({
+                # Host and Port are mandatory.
+                'secondary_host': args.config['secondary_host'],
+                'secondary_port': args.config['secondary_port'],
+            })
+        except KeyError as exc:
+            raise ValueError(
+                "When 'use_secondary' enabled 'secondary_host' and 'secondary_port' must be defined."
+            ) from exc
 
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
