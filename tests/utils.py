@@ -53,7 +53,11 @@ class MockedConnect:
 
 def get_test_connection_config(target_db='postgres', use_secondary=False):
     try:
-        conn_config = {'host': os.environ['TAP_POSTGRES_HOST'],
+        conn_config = {'tap_id': 'test-postgres',
+                       'max_run_seconds': 5,
+                       'break_at_end_lsn': True,
+                       'logical_poll_total_seconds': 2,
+                       'host': os.environ['TAP_POSTGRES_HOST'],
                        'user': os.environ['TAP_POSTGRES_USER'],
                        'password': os.environ['TAP_POSTGRES_PASSWORD'],
                        'port': os.environ['TAP_POSTGRES_PORT'],

@@ -2,18 +2,17 @@ version: "3.3"
 
 services:
   db_primary:
-    image: "docker.io/bitnami/postgresql:12"
+    build: .
     container_name: "primary"
     ports:
       - "5432:5432"
     environment:
       - POSTGRESQL_REPLICATION_MODE=master
-      - POSTGRESQL_REPLICATION_USER=repl_user
-      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
-      - POSTGRES_USER=test_user
-      - POSTGRES_PASSWORD=my-secret-passwd
+      - POSTGRESQL_REPLICATION_USER=test_user
+      - POSTGRESQL_REPLICATION_PASSWORD=my-secret-passwd
       - POSTGRESQL_POSTGRES_PASSWORD=my-secret-passwd
       - POSTGRESQL_DATABASE=tap_postgres_test
+      - POSTGRESQL_WAL_LEVEL=logical
       - ALLOW_EMPTY_PASSWORD=yes
   db_replica:
     image: "docker.io/bitnami/postgresql:12"
@@ -24,8 +23,8 @@ services:
       - db_primary
     environment:
       - POSTGRESQL_REPLICATION_MODE=slave
-      - POSTGRESQL_REPLICATION_USER=repl_user
-      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
+      - POSTGRESQL_REPLICATION_USER=test_user
+      - POSTGRESQL_REPLICATION_PASSWORD=my-secret-passwd
       - POSTGRESQL_MASTER_HOST=db_primary
       - POSTGRESQL_MASTER_PORT_NUMBER=5432
       - ALLOW_EMPTY_PASSWORD=yes
