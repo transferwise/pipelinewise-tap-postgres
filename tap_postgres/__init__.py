@@ -90,8 +90,8 @@ def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
 
 def sync_method_for_streams(streams, state, default_replication_method):
     """
-	Determines the replication method of each stream
-	"""
+    Determines the replication method of each stream
+    """
     lookup = {}
     traditional_steams = []
     logical_streams = []
