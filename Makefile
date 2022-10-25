@@ -11,6 +11,11 @@ pylint:
 start_db:
 	docker-compose up -d
 
-test:
+unit_test:
 	. ./venv/bin/activate ;\
-	pytest --cov=tap_postgres  --cov-fail-under=85 tests -v
+	pytest --cov=tap_postgres --cov-fail-under=58 tests/unit -v
+
+integration_test:
+	. ./venv/bin/activate ;\
+	. /tests/integration/env
+	pytest --cov=tap_postgres  --cov-fail-under=63 tests/integration -v
