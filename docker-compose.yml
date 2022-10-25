@@ -2,8 +2,10 @@ version: "3.3"
 
 services:
   db_primary:
-    image: "docker.io/bitnami/postgresql:12"
     container_name: "primary"
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "5432:5432"
     environment:
@@ -15,6 +17,9 @@ services:
       - POSTGRESQL_POSTGRES_PASSWORD=my-secret-passwd
       - POSTGRESQL_DATABASE=tap_postgres_test
       - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      -  ./db_setup/config:/bitnami/postgresql/conf
+
   db_replica:
     image: "docker.io/bitnami/postgresql:12"
     container_name: replica
