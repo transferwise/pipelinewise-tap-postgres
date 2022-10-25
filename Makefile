@@ -17,5 +17,5 @@ unit_test:
 
 integration_test:
 	. ./venv/bin/activate ;\
-	. /tests/integration/env
+	. ./tests/integration/env ;\
 	pytest --cov=tap_postgres  --cov-fail-under=63 tests/integration -v
