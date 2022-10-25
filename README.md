@@ -171,28 +171,25 @@ to the tap for the next sync.
  make venv
 ```
 
-2. You need to have a postgres database to run the tests and export its credentials:
-```
-  export TAP_POSTGRES_HOST=<postgres-host>
-  export TAP_POSTGRES_PORT=<postgres-port>
-  export TAP_POSTGRES_SECONDARY_HOST=<postgres-replica-host>
-  export TAP_POSTGRES_SECONDARY_PORT=<postgres-replica-port>
-  export TAP_POSTGRES_USER=<postgres-user>
-  export TAP_POSTGRES_PASSWORD=<postgres-password>
-```
+2. You need to have a postgres database to run the tests and export its credentials.
 
 You can make use of the local docker-compose to spin up a test database by running `make start_db`
 
 Test objects will be created in the `postgres` database.
 
-3. To run the tests:
+3. To run the unit tests:
 ```
-  make test
+  make unit_test
+```
+
+4. To run the integration tests:
+```
+  make integration_test
 ```
 
 ### To run pylint:
 
-1. Install python dependencies and run python linter
+Install python dependencies and run python linter
 ```
   make venv
   make pylint
