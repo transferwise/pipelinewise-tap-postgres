@@ -31,5 +31,6 @@ integration_test_cov: integration_test
 	coverage report --data-file=.coverage.integration --fail-under=63
 
 total_cov:
+	. ./venv/bin/activate ;\
 	coverage combine ;\
 	coverage report --fail-under=85
