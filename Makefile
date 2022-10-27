@@ -1,3 +1,5 @@
+COV_OPTIONS ?=
+
 venv:
 	python3 -m venv venv ;\
 	. ./venv/bin/activate ;\
@@ -13,9 +15,21 @@ start_db:
 
 unit_test:
 	. ./venv/bin/activate ;\
-	pytest --cov=tap_postgres --cov-fail-under=58 tests/unit -v
+	coverage run --data-file=.coverage.unit --source=tap_postgres -m pytest -v tests/unit ;\
+
+unit_test_cov: unit_test
+	. ./venv/bin/activate ;\
+	coverage report --data-file=.coverage.unit --fail-under=58
 
 integration_test:
 	. ./venv/bin/activate ;\
 	. ./tests/integration/env ;\
-	pytest --cov=tap_postgres  --cov-fail-under=63 tests/integration -v
+	coverage run --data-file=.coverage.integration --source=tap_postgres -m pytest -v tests/integration ;\
+
+integration_test_cov: integration_test
+	. ./venv/bin/activate ;\
+	coverage report --data-file=.coverage.integration --fail-under=63
+
+total_cov:
+	coverage combine ;\
+	coverage report --fail-under=85
