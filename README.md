@@ -127,7 +127,7 @@ to the tap for the next sync.
 
 * **A connection to the master instance**. Log-based replication will only work by connecting to the master instance.
 
-* **wal2json plugin**: To use Log Based for your PostgreSQL integration, you must install the wal2json plugin.
+* **wal2json plugin**: To use Log Based for your PostgreSQL integration, you must install the wal2json plugin version >= 2.3.
   The wal2json plugin outputs JSON objects for logical decoding, which the tap then uses to perform Log-based Replication.
   Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type
   are in the wal2json’s GitHub repository:

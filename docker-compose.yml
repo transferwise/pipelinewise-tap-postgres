@@ -14,6 +14,9 @@ services:
       - POSTGRESQL_DATABASE=tap_postgres_test
       - POSTGRESQL_WAL_LEVEL=logical
       - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      -  ./db_setup/config:/bitnami/postgresql/conf
+
   db_replica:
     image: "docker.io/bitnami/postgresql:12"
     container_name: replica

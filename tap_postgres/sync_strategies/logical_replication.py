@@ -28,6 +28,7 @@ FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
 class ReplicationSlotNotFoundError(Exception):
     """Custom exception when replication slot not found"""
 
+
 class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
@@ -375,9 +376,68 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         time_extracted=time_extracted)
 
 
-def check_for_new_columns(columns, target_stream, conn_info):
-    diff = set(columns).difference(target_stream['schema']['properties'].keys())
+# pylint: disable=unused-argument,too-many-locals
+def consume_message(streams, state, msg, conn_info):
+    try:
+        payload = json.loads(msg.payload)
+    except Exception:
+        return state
 
+    time_extracted = singer.utils.strptime_to_utc(payload['timestamp'])
+
+    lsn = msg.data_start
+
+    streams_lookup = {s['tap_stream_id']: s for s in streams}
+
+    tap_stream_id = post_db.compute_tap_stream_id(payload['schema'], payload['table'])
+    if streams_lookup.get(tap_stream_id) is None:
+        return state
+
+    target_stream = streams_lookup[tap_stream_id]
+
+    # Example of Insert payload:
+    # {
+    #   "action":"I",
+    #   "schema":"public",
+    #   "table":"awesome_table",
+    #   "columns":[
+    #       {"name":"a","type":"integer","value":1},
+    #       {"name":"b","type":"character varying(30)","value":"Backup"}
+    #    ]
+    # }
+
+    # Example of Delete payload:
+    # {
+    #   "action":"D",
+    #   "schema":"public",
+    #   "table":"awesome_table",
+    #   "identity":[
+    #       {"name":"a","type":"integer","value":1},
+    #       {"name":"c","type":"timestamp without time zone","value":"2019-12-29 04:58:34.806671"}
+    #   ]
+    # }
+
+    # Action Types:
+    # I = Insert
+    # U = Update
+    # D = Delete
+    # B = Begin Transaction
+    # C = Commit Transaction
+    # M = Message
+    # T = Truncate
+    action = payload['action']
+
+    if action not in {'I', 'U', 'D'}:
+        raise UnsupportedPayloadKindError(f"unrecognized replication operation: {action}")
+
+    # Get the additional fields in payload that are not in schema properties:
+    # only inserts and updates have the list of columns that can be used to detect any different in columns
+    diff = set()
+    if action in {'I', 'U'}:
+        diff = {column['name'] for column in payload['columns']}.\
+            difference(target_stream['schema']['properties'].keys())
+
+    # if there is new columns in the payload that are not in the schema properties then refresh the stream schema
     if diff:
         LOGGER.info('Detected new columns "%s", refreshing schema of stream %s', diff, target_stream['stream'])
         # encountered a column that is not in the schema
@@ -390,185 +450,47 @@ def check_for_new_columns(columns, target_stream, conn_info):
         # publish new schema
         sync_common.send_schema_message(target_stream, ['lsn'])
 
-
-# pylint: disable=too-many-locals
-def consume_message_format_1(payload, conn_info, streams_lookup, state, lsn):
-    tap_stream_id = post_db.compute_tap_stream_id(payload['schema'], payload['table'])
-    if streams_lookup.get(tap_stream_id) is None:
-        return state
-
-    target_stream = streams_lookup[tap_stream_id]
-
-    if payload['kind'] not in {'insert', 'update', 'delete'}:
-        raise UnsupportedPayloadKindError(f"unrecognized replication operation: {payload['kind']}")
-
-    # Get the additional fields in payload that are not in schema properties:
-    # only inserts and updates have the list of columns that can be used to detect any different in columns
-    if payload['kind'] in {'insert', 'update'}:
-        check_for_new_columns(payload['columnnames'], target_stream, conn_info)
-
-    time_extracted = utils.now()
-
     stream_version = get_stream_version(target_stream['tap_stream_id'], state)
     stream_md_map = metadata.to_map(target_stream['metadata'])
 
     desired_columns = {c for c in target_stream['schema']['properties'].keys() if sync_common.should_sync_column(
         stream_md_map, c)}
 
-    if payload['kind'] in {'insert', 'update'}:
-        col_names = []
-        col_vals = []
+    col_names = []
+    col_vals = []
 
-        for idx, col in enumerate(payload['columnnames']):
-            if col in desired_columns:
-                col_names.append(col)
-                col_vals.append(payload['columnvalues'][idx])
+    if action in {'I', 'U'}:
+        for col in payload['columns']:
+            if col['name'] in desired_columns:
+                col_names.append(col['name'])
+                col_vals.append(col['value'])
 
         col_names.append('_sdc_deleted_at')
         col_vals.append(None)
 
-        if conn_info.get('debug_lsn'):
-            col_names.append('_sdc_lsn')
-            col_vals.append(str(lsn))
-
-        record_message = row_to_singer_message(target_stream,
-                                               col_vals,
-                                               stream_version,
-                                               col_names,
-                                               time_extracted,
-                                               stream_md_map,
-                                               conn_info)
-
-    elif payload['kind'] == 'delete':
-        col_names = []
-        col_vals = []
-        for idx, col in enumerate(payload['oldkeys']['keynames']):
-            if col in desired_columns:
-                col_names.append(col)
-                col_vals.append(payload['oldkeys']['keyvalues'][idx])
+    elif action == 'D':
+        for column in payload['identity']:
+            if column['name'] in set(desired_columns):
+                col_names.append(column['name'])
+                col_vals.append(column['value'])
 
         col_names.append('_sdc_deleted_at')
         col_vals.append(singer.utils.strftime(time_extracted))
 
-        if conn_info.get('debug_lsn'):
-            col_names.append('_sdc_lsn')
-            col_vals.append(str(lsn))
+    if conn_info.get('debug_lsn'):
+        col_names.append('_sdc_lsn')
+        col_vals.append(str(lsn))
 
-        record_message = row_to_singer_message(target_stream,
-                                               col_vals,
-                                               stream_version,
-                                               col_names,
-                                               time_extracted,
-                                               stream_md_map,
-                                               conn_info)
+    record_message = row_to_singer_message(target_stream,
+                                           col_vals,
+                                           stream_version,
+                                           col_names,
+                                           time_extracted,
+                                           stream_md_map,
+                                           conn_info)
 
     singer.write_message(record_message)
     state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
-
-    return state
-
-
-def consume_message_format_2(payload, conn_info, streams_lookup, state, lsn):
-    ## Action Types:
-    # I = Insert
-    # U = Update
-    # D = Delete
-    # B = Begin Transaction
-    # C = Commit Transaction
-    # M = Message
-    # T = Truncate
-    action = payload['action']
-    if action not in {'U', 'I', 'D'}:
-        raise UnsupportedPayloadKindError(f"unrecognized replication operation: {action}")
-
-    time_extracted = singer.utils.strptime_to_utc(payload['timestamp'])
-
-    tap_stream_id = post_db.compute_tap_stream_id(payload['schema'], payload['table'])
-    if streams_lookup.get(tap_stream_id) is not None:
-        target_stream = streams_lookup[tap_stream_id]
-
-        # Get the additional fields in payload that are not in schema properties:
-        # only inserts and updates have the list of columns that can be used to detect any different in columns
-        if payload['action'] in {'I', 'U'}:
-            check_for_new_columns({column['name'] for column in payload['columns']}, target_stream, conn_info)
-
-        stream_version = get_stream_version(target_stream['tap_stream_id'], state)
-        stream_md_map = metadata.to_map(target_stream['metadata'])
-
-        desired_columns = {c for c in target_stream['schema']['properties'].keys() if sync_common.should_sync_column(
-            stream_md_map, c)}
-
-        stream_version = get_stream_version(target_stream['tap_stream_id'], state)
-        stream_md_map = metadata.to_map(target_stream['metadata'])
-
-        desired_columns = [
-            col for col in target_stream['schema']['properties'].keys()
-            if sync_common.should_sync_column(stream_md_map, col)
-        ]
-
-        col_names = []
-        col_vals = []
-        if payload['action'] in ['I', 'U']:
-            for column in payload['columns']:
-                if column['name'] in set(desired_columns):
-                    col_names.append(column['name'])
-                    col_vals.append(column['value'])
-
-            col_names = col_names + ['_sdc_deleted_at']
-            col_vals = col_vals + [None]
-
-            if conn_info.get('debug_lsn'):
-                col_names = col_names + ['_sdc_lsn']
-                col_vals = col_vals + [str(lsn)]
-
-        elif payload['action'] == 'D':
-            for column in payload['identity']:
-                if column['name'] in set(desired_columns):
-                    col_names.append(column['name'])
-                    col_vals.append(column['value'])
-
-            col_names = col_names + ['_sdc_deleted_at']
-            col_vals = col_vals + [singer.utils.strftime(time_extracted)]
-
-            if conn_info.get('debug_lsn'):
-                col_vals = col_vals + [str(lsn)]
-                col_names = col_names + ['_sdc_lsn']
-
-        # Write 1 record to match the API of V1
-        record_message = row_to_singer_message(
-            target_stream,
-            col_vals,
-            stream_version,
-            col_names,
-            time_extracted,
-            stream_md_map,
-            conn_info,
-        )
-
-        singer.write_message(record_message)
-        state = singer.write_bookmark(state, target_stream['tap_stream_id'], 'lsn', lsn)
-
-    return state
-
-
-def consume_message(streams, state, msg, conn_info):
-    # Strip leading comma generated by write-in-chunks and parse valid JSON
-    try:
-        payload = json.loads(msg.payload.lstrip(','))
-    except Exception:
-        return state
-
-    lsn = msg.data_start
-
-    streams_lookup = {s['tap_stream_id']: s for s in streams}
-
-    message_format = conn_info['wal2json_message_format']
-    if message_format == 1:
-        state = consume_message_format_1(payload, conn_info, streams_lookup, state, lsn)
-    elif message_format == 2:
-        state = consume_message_format_2(payload, conn_info, streams_lookup, state, lsn)
-    else:
-        raise Exception(f"Unknown wal2json message format version: {message_format}")
 
     return state
 
@@ -593,6 +515,7 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
 
     # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
     return re.sub('[^a-z0-9_]', '_', slot_name)
+
 
 def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
     slot_name_v15 = generate_replication_slot_name(dbname)
@@ -657,14 +580,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     slot = locate_replication_slot(conn_info)
     lsn_last_processed = None
     lsn_currently_processing = None
-    lsn_received_timestamp = None
     lsn_processed_count = 0
     start_run_timestamp = datetime.datetime.utcnow()
     max_run_seconds = conn_info['max_run_seconds']
     break_at_end_lsn = conn_info['break_at_end_lsn']
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 10800  # 3 hours
     poll_interval = 10
-    poll_timestamp = None
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
@@ -706,7 +627,14 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                               decode=True,
                               start_lsn=start_lsn,
                               status_interval=poll_interval,
-                              options=options)
+                              options={
+                                  'format-version': 2,
+                                  'include-transaction': False,
+                                  'include-timestamp': True,
+                                  'include-types': False,
+                                  'actions': 'insert,update,delete',
+                                  'add-tables': streams_to_wal2json_tables(logical_streams)
+                              })
 
     except psycopg2.ProgrammingError as ex:
         raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
@@ -740,7 +668,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                                 int_to_lsn(end_lsn))
                     break
 
-                state = consume_message(logical_streams, state, msg, conn_info)
+                state = consume_message(logical_streams, state, msg)
 
                 # When using wal2json with write-in-chunks, multiple messages can have the same lsn
                 # This is to ensure we only flush to lsn that has completed entirely
