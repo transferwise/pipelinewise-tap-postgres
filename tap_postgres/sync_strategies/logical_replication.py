@@ -607,22 +607,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     int_to_lsn(start_lsn),
                     int_to_lsn(end_lsn),
                     slot)
-        # psycopg2 2.8.4 will send a keep-alive message to postgres every status_interval
-        options = {
-            'add-tables': streams_to_wal2json_tables(logical_streams),
-            'include-timestamp': True,
-            'include-types': False,
-        }
-        if conn_info['wal2json_message_format'] == 1:
-            options.update({'write-in-chunks': 1})
-        else:
-            options.update(
-                {
-                    'format-version': conn_info['wal2json_message_format'],
-                    'include-transaction': False,
-                    'actions': 'insert,update,delete',
-                }
-            )
         cur.start_replication(slot_name=slot,
                               decode=True,
                               start_lsn=start_lsn,
