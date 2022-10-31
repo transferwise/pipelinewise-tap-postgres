@@ -668,7 +668,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                                 int_to_lsn(end_lsn))
                     break
 
-                state = consume_message(logical_streams, state, msg)
+                state = consume_message(logical_streams, state, msg, conn_info)
 
                 # When using wal2json with write-in-chunks, multiple messages can have the same lsn
                 # This is to ensure we only flush to lsn that has completed entirely
