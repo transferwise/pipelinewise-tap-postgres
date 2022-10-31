@@ -10,7 +10,7 @@ import warnings
 
 from select import select
 from psycopg2 import sql
-from singer import metadata, utils, get_bookmark
+from singer import metadata, get_bookmark
 from dateutil.parser import parse, UnknownTimezoneWarning, ParserError
 from functools import reduce
 
