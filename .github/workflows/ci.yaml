@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ 3.6, 3.7, 3.8, 3.9 ]
+        python-version: [ 3.7, 3.8, 3.9 ]
 
     steps:
       - name: Checkout repository
@@ -33,13 +33,13 @@ jobs:
       - name: Pylinting
         run: make pylint
 
-      - name: Tests
+      - name: Unit tests
+        run: make unit_test_cov
+
+      - name: Integration tests
         env:
-          TAP_POSTGRES_HOST: localhost
-          TAP_POSTGRES_PORT: 5432
-          TAP_POSTGRES_USER: test_user
-          TAP_POSTGRES_PASSWORD: my-secret-passwd
-          TAP_POSTGRES_SECONDARY_HOST: localhost
-          TAP_POSTGRES_SECONDARY_PORT: 5433
           LOGGING_CONF_FILE: ./sample_logging.conf
-        run: make test
+        run: make integration_test_cov
+
+      - name: Check Total test coverage
+        run: make total_cov

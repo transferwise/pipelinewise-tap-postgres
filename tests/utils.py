@@ -56,9 +56,15 @@ def get_test_connection_config(target_db='postgres', use_secondary=False):
         conn_config = {'host': os.environ['TAP_POSTGRES_HOST'],
                        'user': os.environ['TAP_POSTGRES_USER'],
                        'password': os.environ['TAP_POSTGRES_PASSWORD'],
+                       'postgres_password': os.environ['TAP_POSTGRES_PG_PASSWORD'],
                        'port': os.environ['TAP_POSTGRES_PORT'],
                        'dbname': target_db,
-                       'use_secondary': use_secondary,}
+                       'use_secondary': use_secondary,
+                       'tap_id': 'tap_test',
+                       'max_run_seconds': 43200,
+                       'break_at_end_lsn': True,
+                       'logical_poll_total_seconds': 2
+                       }
     except KeyError as exc:
         raise Exception(
             "set TAP_POSTGRES_HOST, TAP_POSTGRES_USER, TAP_POSTGRES_PASSWORD, TAP_POSTGRES_PORT"
@@ -77,13 +83,17 @@ def get_test_connection_config(target_db='postgres', use_secondary=False):
 
     return conn_config
 
+
 def get_test_connection(target_db='postgres', superuser=False):
     conn_config = get_test_connection_config(target_db)
-    user = 'postgres' if superuser else conn_config['user']
+
+    user, password = ('postgres', conn_config['postgres_password']) if superuser \
+        else (conn_config['user'], conn_config['password'])
+
     conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(conn_config['host'],
                                                                                    conn_config['dbname'],
                                                                                    user,
-                                                                                   conn_config['password'],
+                                                                                   password,
                                                                                    conn_config['port'])
     LOGGER.info("connecting to {}".format(conn_config['host']))
 
@@ -107,7 +117,7 @@ def build_table(table, cur):
     if len(pks) != 0:
         pk_sql = ",\n CONSTRAINT {}  PRIMARY KEY({})".format(quote_ident(table['name'] + "_pk", cur), " ,".join(pks))
     else:
-       pk_sql = ""
+        pk_sql = ""
 
     sql = "{} ( {} {})".format(create_sql, ",\n".join(col_sql), pk_sql)
 
@@ -116,17 +126,7 @@ def build_table(table, cur):
 def ensure_test_table(table_spec, target_db='postgres'):
     with get_test_connection(target_db) as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-            sql = """SELECT *
-                       FROM information_schema.tables
-                      WHERE table_schema = 'public'
-                        AND table_name = %s"""
-
-            cur.execute(sql,
-                        [table_spec['name']])
-            old_table = cur.fetchall()
-
-            if len(old_table) != 0:
-                cur.execute('DROP TABLE {} cascade'.format(quote_ident(table_spec['name'], cur)))
+            cur.execute('DROP TABLE if exists {} cascade'.format(quote_ident(table_spec['name'], cur)))
 
             sql = build_table(table_spec, cur)
             LOGGER.info("create table sql: %s", sql)
@@ -141,7 +141,7 @@ def unselect_column(our_stream, col):
 def set_replication_method_for_stream(stream, method):
     new_md = metadata.to_map(stream['metadata'])
     old_md = new_md.get(())
-    old_md.update({'replication-method': method})
+    old_md.update({'replication-method': method, 'selected': True})
 
     stream['metadata'] = metadata.to_list(new_md)
     return stream
@@ -204,44 +204,26 @@ def insert_record(cursor, table_name, data):
     cursor.execute(insert_sql, list(map(crud_up_value, our_values)))
 
 
-def verify_crud_messages(that, caught_messages, pks):
+def create_replication_slot(target_db='postgres', tap_id='tap_test'):
 
-    that.assertEqual(14, len(caught_messages))
-    that.assertTrue(isinstance(caught_messages[0], singer.SchemaMessage))
-    that.assertTrue(isinstance(caught_messages[1], singer.RecordMessage))
-    that.assertTrue(isinstance(caught_messages[2], singer.StateMessage))
-    that.assertTrue(isinstance(caught_messages[3], singer.RecordMessage))
-    that.assertTrue(isinstance(caught_messages[4], singer.StateMessage))
-    that.assertTrue(isinstance(caught_messages[5], singer.RecordMessage))
-    that.assertTrue(isinstance(caught_messages[6], singer.StateMessage))
-    that.assertTrue(isinstance(caught_messages[7], singer.RecordMessage))
-    that.assertTrue(isinstance(caught_messages[8], singer.StateMessage))
-    that.assertTrue(isinstance(caught_messages[9], singer.RecordMessage))
-    that.assertTrue(isinstance(caught_messages[10], singer.StateMessage))
-    that.assertTrue(isinstance(caught_messages[11], singer.RecordMessage))
-    that.assertTrue(isinstance(caught_messages[12], singer.StateMessage))
-    that.assertTrue(isinstance(caught_messages[13], singer.StateMessage))
+    sql = f"select pg_create_logical_replication_slot('pipelinewise_{target_db}_{tap_id}', 'wal2json');"
 
-    #schema includes scn && _sdc_deleted_at because we selected logminer as our replication method
-    that.assertEqual({"type" : ['integer']}, caught_messages[0].schema.get('properties').get('scn') )
-    that.assertEqual({"type" : ['null', 'string'], "format" : "date-time"}, caught_messages[0].schema.get('properties').get('_sdc_deleted_at') )
+    with get_test_connection(target_db) as conn:
+        with conn.cursor() as cur:
+            LOGGER.info("Creating replication slot: %s", sql)
+            cur.execute(sql)
 
-    that.assertEqual(pks, caught_messages[0].key_properties)
 
-    #verify first STATE message
-    bookmarks_1 = caught_messages[2].value.get('bookmarks')['ROOT-CHICKEN']
-    that.assertIsNotNone(bookmarks_1)
-    bookmarks_1_scn = bookmarks_1.get('scn')
-    bookmarks_1_version = bookmarks_1.get('version')
-    that.assertIsNotNone(bookmarks_1_scn)
-    that.assertIsNotNone(bookmarks_1_version)
+def drop_replication_slot(target_db='postgres', tap_id='tap_test'):
 
-    #verify STATE message after UPDATE
-    bookmarks_2 = caught_messages[6].value.get('bookmarks')['ROOT-CHICKEN']
-    that.assertIsNotNone(bookmarks_2)
-    bookmarks_2_scn = bookmarks_2.get('scn')
-    bookmarks_2_version = bookmarks_2.get('version')
-    that.assertIsNotNone(bookmarks_2_scn)
-    that.assertIsNotNone(bookmarks_2_version)
-    that.assertGreater(bookmarks_2_scn, bookmarks_1_scn)
-    that.assertEqual(bookmarks_2_version, bookmarks_1_version)
+    sql = f"SELECT pg_drop_replication_slot('pipelinewise_{target_db}_{tap_id}');"
+
+    with get_test_connection(target_db) as conn:
+        with conn.cursor() as cur:
+            LOGGER.info("Dropping replication slot: %s", sql)
+            cur.execute(sql)
+
+def drop_table(table_name, target_db='postgres'):
+    with get_test_connection(target_db) as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            cur.execute('DROP TABLE IF EXISTS {} cascade'.format(quote_ident(table_name, cur)))
