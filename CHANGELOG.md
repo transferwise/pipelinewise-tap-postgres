@@ -1,3 +1,9 @@
+2.0.0 (2022-11-02)
+-------------------
+**Changes**
+- LOG_BASED: Use wal2json format-version v2 to read WAL, require wal2json >= 2.3 to be installed on pg server.
+- Bump `psycopg2-binary` from `2.9.4` to `2.9.5`
+
 1.8.4 (2022-09-08)
 -------------------
 **Changes**
