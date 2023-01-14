@@ -141,5 +141,6 @@ def _get_select_sql(params):
         select_sql = f"""
         SELECT {','.join(escaped_columns)}
         FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
+        ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC
         """
     return select_sql
