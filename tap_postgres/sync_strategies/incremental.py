@@ -23,10 +23,10 @@ def fetch_max_replication_key(conn_config, replication_key, schema_name, table_n
             max_key_sql = """SELECT max({})
                               FROM {}""".format(post_db.prepare_columns_sql(replication_key),
                                                 post_db.fully_qualified_table_name(schema_name, table_name))
-            LOGGER.info("determine max replication key value: %s", max_key_sql)
+            LOGGER.debug("determine max replication key value: %s", max_key_sql)
             cur.execute(max_key_sql)
             max_key = cur.fetchone()[0]
-            LOGGER.info("max replication key value: %s", max_key)
+            LOGGER.debug("max replication key value: %s", max_key)
             return max_key
 
 
@@ -56,8 +56,13 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     singer.write_message(activate_version_message)
 
     replication_key = md_map.get((), {}).get('replication-key')
+    if not replication_key:
+        raise ValueError(f"No primary key present in {stream['table_name']} but that is required for INCREMENTAL sync")
     replication_key_value = singer.get_bookmark(state, stream['tap_stream_id'], 'replication_key_value')
-    replication_key_sql_datatype = md_map.get(('properties', replication_key)).get('sql-datatype')
+    replication_key_prop = md_map.get(('properties', replication_key))
+    if not replication_key_prop:
+        raise ValueError(f"No type information on primary key in {stream['table_name']}")
+    replication_key_sql_datatype = replication_key_prop.get('sql-datatype')
 
     hstore_available = post_db.hstore_available(conn_info)
     with metrics.record_counter(None) as counter:
@@ -67,15 +72,15 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
             # The server / db can also have its own configred encoding.
             with conn.cursor() as cur:
                 cur.execute("show server_encoding")
-                LOGGER.info("Current Server Encoding: %s", cur.fetchone()[0])
+                LOGGER.debug("Current Server Encoding: %s", cur.fetchone()[0])
                 cur.execute("show client_encoding")
-                LOGGER.info("Current Client Encoding: %s", cur.fetchone()[0])
+                LOGGER.debug("Current Client Encoding: %s", cur.fetchone()[0])
 
             if hstore_available:
-                LOGGER.info("hstore is available")
+                LOGGER.debug("hstore is available")
                 psycopg2.extras.register_hstore(conn)
             else:
-                LOGGER.info("hstore is UNavailable")
+                LOGGER.debug("hstore is Unavailable")
 
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
                 cur.itersize = post_db.CURSOR_ITER_SIZE
