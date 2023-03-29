@@ -145,5 +145,6 @@ def _get_select_sql(params):
         select_sql = f"""
         SELECT {','.join(escaped_columns)}
         FROM {post_db.fully_qualified_table_name(schema_name, table_name)}
+        ORDER BY {replication_key} ASC {limit_statement}
         """
     return select_sql
