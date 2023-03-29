@@ -130,21 +130,16 @@ def _get_select_sql(params):
     table_name = params['table_name']
 
     limit_statement = f'LIMIT {params["limit"]}' if params["limit"] else ''
+    where_statement = f"WHERE {replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
+        if replication_key_value else ""
 
-    if replication_key_value:
-        select_sql = f"""
-        SELECT {','.join(escaped_columns)}
-        FROM (
-            SELECT *
-            FROM {post_db.fully_qualified_table_name(schema_name, table_name)}
-            WHERE {replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}
-            ORDER BY {replication_key} ASC {limit_statement}
-        ) pg_speedup_trick;"""
-    else:
-        # if not replication_key_value
-        select_sql = f"""
-        SELECT {','.join(escaped_columns)}
-        FROM {post_db.fully_qualified_table_name(schema_name, table_name)}
+    select_sql = f"""
+    SELECT {','.join(escaped_columns)}
+    FROM (
+        SELECT *
+        FROM {post_db.fully_qualified_table_name(schema_name, table_name)} 
+        {where_statement}
         ORDER BY {replication_key} ASC {limit_statement}
-        """
+    ) pg_speedup_trick;"""
+
     return select_sql
