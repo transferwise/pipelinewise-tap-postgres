@@ -1,0 +1,8 @@
+export TAP_POSTGRES_HOST=127.0.0.1
+export TAP_POSTGRES_PORT=5432
+export TAP_POSTGRES_USER=repl_user
+export TAP_POSTGRES_PASSWORD=repl_password
+export TAP_POSTGRES_SECONDARY_HOST=127.0.0.1
+export TAP_POSTGRES_SECONDARY_PORT=5433
+export TAP_POSTGRES_DB=tap_postgres_test
+export TAP_POSTGRES_PG_PASSWORD=my-secret-passwd

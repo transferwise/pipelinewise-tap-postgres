@@ -29,7 +29,8 @@ class TestIncremental(TestCase):
             'user': 'foo_user',
             'password': 'foo_pass',
             'port': 12345,
-            'use_secondary': False
+            'use_secondary': False,
+            'limit': None
         }
         self.stream = {'tap_stream_id': 5, 'stream': 'bar', 'table_name': 'pg_tbl'}
         self.md_map = {

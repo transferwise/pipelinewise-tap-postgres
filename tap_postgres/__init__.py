@@ -395,6 +395,8 @@ def main_impl():
     Main method
     """
     args = parse_args(REQUIRED_CONFIG_KEYS)
+
+    limit = args.config.get('limit')
     conn_config = {
         # Required config keys
         'host': args.config['host'],
@@ -411,7 +413,7 @@ def main_impl():
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
         'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
         'use_secondary': args.config.get('use_secondary', False),
-        'wal2json_message_format': args.config.get('wal2json_message_format', 1)
+        'limit': int(limit) if limit else None
     }
 
     if conn_config['use_secondary']:
