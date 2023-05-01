@@ -131,6 +131,8 @@ def sync_method_for_streams(streams, state, default_replication_method):
             # finishing previously interrupted full-table (first stage of logical replication)
             lookup[stream['tap_stream_id']] = 'logical_initial_interrupted'
             traditional_steams.append(stream)
+            # do any required logical replication after inital sync is complete
+            logical_streams.append(stream)
 
         # inconsistent state
         elif get_bookmark(state, stream['tap_stream_id'], 'xmin') and \
@@ -142,6 +144,8 @@ def sync_method_for_streams(streams, state, default_replication_method):
             # initial full-table phase of logical replication
             lookup[stream['tap_stream_id']] = 'logical_initial'
             traditional_steams.append(stream)
+            # do any required logical replication after inital sync is complete
+            logical_streams.append(stream)
 
         else:  # no xmin but we have an lsn
             # initial stage of logical replication(full-table) has been completed. moving onto pure logical replication
