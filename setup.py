@@ -5,7 +5,7 @@ from setuptools import setup
 with open('README.md') as f:
     long_description = f.read()
 
-setup(name='pipelinewise-tap-postgres',
+setup(name='oc-pipelinewise-tap-postgres',
       version='2.1.1',
       description='Singer.io tap for extracting data from PostgresSQL - PipelineWise compatible',
       long_description=long_description,
