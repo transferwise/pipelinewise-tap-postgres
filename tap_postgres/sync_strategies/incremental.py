@@ -134,7 +134,7 @@ def _get_select_sql(params):
 
     if not params["offset"] or not replication_key_value:
         offset = ''
-    elif replication_key_sql_datatype.startswith('timestamp')':
+    elif replication_key_sql_datatype.startswith('timestamp'):
         offset = f' - interval \'{params["offset"]} seconds\''
     else:
         offset = f' - {params["offset"]}'
