@@ -132,7 +132,7 @@ def _get_select_sql(params):
 
     limit_statement = f'LIMIT {params["limit"]}' if params["limit"] else ''
 
-    where_incr = f"WHERE {replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
+    where_incr = f"{replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
         if replication_key_value else ""
 
     where_skip = f"{replication_key} <= NOW() - interval \'{params["skip_last_n_seconds"]} seconds\'" \
