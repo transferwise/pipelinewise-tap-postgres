@@ -88,7 +88,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                               "schema_name": schema_name,
                                               "table_name": stream['table_name'],
                                               "limit": conn_info['limit'],
-                                              "offset": conn_info['offset']
+                                              "skip_last_n_seconds": conn_info['skip_last_n_seconds']
                                               })
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
