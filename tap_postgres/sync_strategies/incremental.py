@@ -135,7 +135,7 @@ def _get_select_sql(params):
     where_incr = f"{replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
         if replication_key_value else ""
 
-    where_skip = f"{replication_key} <= NOW() - interval \'{params["skip_last_n_seconds"]} seconds\'" \
+    where_skip = f"{replication_key} <= NOW() - interval '{params["skip_last_n_seconds"]} seconds'" \
         if params["skip_last_n_seconds"] and replication_key_sql_datatype.startswith("timestamp") else ""
 
     where_statement = f"WHERE {where_incr}{' AND ' if where_incr and where_skip else ''}{where_skip}" \
