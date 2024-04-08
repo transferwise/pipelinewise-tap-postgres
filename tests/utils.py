@@ -132,6 +132,23 @@ def ensure_test_table(table_spec, target_db='postgres'):
             LOGGER.info("create table sql: %s", sql)
             cur.execute(sql)
 
+def build_alter_table_sql(table, col_spec):
+    sqls = []
+    if altered_name:=col_spec.get('changed_name'):
+        sqls.append("ALTER TABLE {} RENAME COLUMN {} TO {}".format(table, col_spec['name'], altered_name))
+    if altered_type:=col_spec.get('type'):
+        sqls.append("ALTER TABLE {} ALTER COLUMN {} TYPE {}".format(table, col_spec['name'], altered_type))
+    return sqls
+    
+def alter_schema_test_table(table_spec, target_db='postgres'):
+    with get_test_connection(target_db) as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            table = table_spec['name']
+            for col_spec in table_spec['columns']:
+                for sql in build_alter_table_sql(table, col_spec):
+                    LOGGER.info("alter table sql: %s", sql)
+                    cur.execute(sql)
+
 def unselect_column(our_stream, col):
     md = metadata.to_map(our_stream['metadata'])
     md.get(('properties', col))['selected'] = False
