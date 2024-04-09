@@ -77,7 +77,8 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
         # For every stream dictionary, update the schema and metadata from the new discovery
         for idx, stream in enumerate(streams):
             # update schema
-            streams[idx]['schema'] = copy.deepcopy(new_discovery[stream['tap_stream_id']]['schema'])
+            discovered_stream = new_discovery[stream['tap_stream_id']]
+            streams[idx]['schema'] = merge_stream_schema(stream, discovered_stream)
 
             # Update metadata
             #
@@ -86,17 +87,32 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
             md_map = metadata.to_map(stream['metadata'])
             meta = md_map.get(())
 
-            for idx_met, metadatum in enumerate(new_discovery[stream['tap_stream_id']]['metadata']):
+            for idx_met, metadatum in enumerate(discovered_stream['metadata']):
                 if not metadatum['breadcrumb']:
-                    meta.update(new_discovery[stream['tap_stream_id']]['metadata'][idx_met]['metadata'])
-                    new_discovery[stream['tap_stream_id']]['metadata'][idx_met]['metadata'] = meta
+                    meta.update(discovered_stream['metadata'][idx_met]['metadata'])
+                    discovered_stream['metadata'][idx_met]['metadata'] = meta
 
             # 2nd step: now copy all the metadata from the updated new discovery to the original stream
-            streams[idx]['metadata'] = copy.deepcopy(new_discovery[stream['tap_stream_id']]['metadata'])
+            streams[idx]['metadata'] = copy.deepcopy(discovered_stream['metadata'])
 
     LOGGER.debug('Updated streams schemas %s', streams)
+    LOGGER.info("The first stream is %s", streams)
 
-
+def merge_stream_schema(stream, discovered_stream):
+    """
+    When the db discovery happens, the stream schema (infered from the catalog) is updated with the new schema in the discovery.
+    This scenario makes the schema specified in the config yaml file become in vain. 
+    This function merges the schema from the catalog with the schema from the discovery, 
+    hence helping the tap to resist to the schema evolution but retain the configured schema from users.
+    """
+    discovered_schema = copy.deepcopy(discovered_stream['schema'])
+    for column, column_schema in stream['schema']['properties'].items():
+        if column in discovered_schema['properties'] and column_schema != discovered_schema['properties'][column]:
+            override = copy.deepcopy(stream['schema']['properties'][column])
+            LOGGER.info('Overriding schema for %s.%s with %s', stream['tap_stream_id'], column, override)
+            discovered_schema['properties'][column].update(override)
+    return discovered_schema
+    
 def any_logical_streams(streams, default_replication_method):
     """
     Checks if streams list contains any stream with log_based method
