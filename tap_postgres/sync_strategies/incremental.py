@@ -87,7 +87,8 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                               "replication_key_value": replication_key_value,
                                               "schema_name": schema_name,
                                               "table_name": stream['table_name'],
-                                              "limit": conn_info['limit']
+                                              "limit": conn_info['limit'],
+                                              "skip_last_n_seconds": conn_info['skip_last_n_seconds']
                                               })
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
@@ -130,8 +131,15 @@ def _get_select_sql(params):
     table_name = params['table_name']
 
     limit_statement = f'LIMIT {params["limit"]}' if params["limit"] else ''
-    where_statement = f"WHERE {replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
+
+    where_incr = f"{replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
         if replication_key_value else ""
+
+    where_skip = f"{replication_key} <= NOW() - interval '{params['skip_last_n_seconds']} seconds'" \
+        if params["skip_last_n_seconds"] and replication_key_sql_datatype.startswith("timestamp") else ""
+
+    where_statement = f"WHERE {where_incr}{' AND ' if where_incr and where_skip else ''}{where_skip}" \
+        if where_incr or where_skip else ""
 
     select_sql = f"""
     SELECT {','.join(escaped_columns)}
