@@ -124,18 +124,9 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                 cur.itersize = post_db.CURSOR_ITER_SIZE
 
                 fq_table_name = post_db.fully_qualified_table_name(schema_name, stream['table_name'])
-                xmin = singer.get_bookmark(state, stream['tap_stream_id'], 'xmin')
-                if xmin:
-                    LOGGER.info("Resuming Full Table replication %s from xmin %s", nascent_stream_version, xmin)
-                    select_sql = f"""
-                        SELECT {','.join(escaped_columns)}, xmin::text::bigint
-                        FROM {fq_table_name} where age(xmin::xid) <= age('{xmin}'::xid)
-                        ORDER BY xmin::text ASC"""
-                else:
-                    LOGGER.info("Beginning new Full Table replication %s", nascent_stream_version)
-                    select_sql = f"""SELECT {','.join(escaped_columns)}, xmin::text::bigint
-                                      FROM {fq_table_name}
-                                     ORDER BY xmin::text ASC"""
+                LOGGER.info("Beginning new Full Table replication %s", nascent_stream_version)
+                select_sql = f"""SELECT {','.join(escaped_columns)}, xmin::text::bigint
+                                    FROM {fq_table_name}"""
 
                 LOGGER.info("select %s with itersize %s", select_sql, cur.itersize)
                 cur.execute(select_sql)
