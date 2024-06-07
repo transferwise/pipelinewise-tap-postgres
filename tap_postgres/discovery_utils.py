@@ -154,11 +154,16 @@ def discover_columns(connection, table_info):
 
             column_schemas = {col_name: schema_for_column(col_info) for col_name, col_info in columns.items()}
 
-            schema = {'type': 'object',
-                      'properties': column_schemas,
-                      'definitions': {}}
+            # schema = {'type': 'object',
+            #           'properties': column_schemas,
+            #           'definitions': {}}
 
-            schema = include_array_schemas(columns, schema)
+            schema = {
+                'type': 'object',
+                'properties': column_schemas
+            }
+
+            # schema = include_array_schemas(columns, schema)
 
             for c_name in column_schemas.keys():
                 mdata = write_sql_data_type_md(mdata, columns[c_name])
@@ -219,8 +224,9 @@ def schema_for_column_datatype(col):
         return schema
 
     if data_type == 'hstore':
-        schema['type'] = nullable_column('object', col.is_primary_key)
-        schema['properties'] = {}
+        # schema['type'] = nullable_column('object', col.is_primary_key)
+        # schema['properties'] = {}
+        schema['type'] = nullable_columns('string', col.is_primary_key)
         return schema
 
     if data_type == 'citext':
@@ -228,7 +234,8 @@ def schema_for_column_datatype(col):
         return schema
 
     if data_type in JSON_TYPES:
-        schema['type'] = nullable_columns(['object', 'array'], col.is_primary_key)
+        # schema['type'] = nullable_columns(['object', 'array'], col.is_primary_key)
+        schema['type'] = nullable_columns(['string'], col.is_primary_key)
         return schema
 
     if data_type == 'numeric':
@@ -291,9 +298,12 @@ def schema_for_column(col_info):
     # either. These means we can say nothing about an array column. its items may be more arrays or primitive types
     # like integers and this can vary on a row by row basis
 
-    column_schema = {'type': ["null", "array"]}
-    if not col_info.is_array:
-        return schema_for_column_datatype(col_info)
+    # column_schema = {'type': ["null", "array"]}
+    column_schema = {'type': ["null", "string"]}
+    
+    # if not col_info.is_array:
+        # return schema_for_column_datatype(col_info)
+    return schema_for_column_datatype(col_info)
 
     if col_info.sql_data_type == 'integer[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_integer_array'}
