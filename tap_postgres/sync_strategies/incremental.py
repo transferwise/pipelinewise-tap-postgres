@@ -86,7 +86,9 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                               "replication_key_sql_datatype": replication_key_sql_datatype,
                                               "replication_key_value": replication_key_value,
                                               "schema_name": schema_name,
-                                              "stream": stream})
+                                              "table_name": stream['table_name'],
+                                              "limit": conn_info['limit']
+                                              })
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
 
@@ -111,7 +113,6 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                                       'replication_key_value',
                                                       record_message.record[replication_key])
 
-
                     if rows_saved % UPDATE_BOOKMARK_PERIOD == 0:
                         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
@@ -122,20 +123,23 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
 def _get_select_sql(params):
     escaped_columns = params['escaped_columns']
-    replication_key = params['replication_key']
+    replication_key = post_db.prepare_columns_sql(params['replication_key'])
     replication_key_sql_datatype = params['replication_key_sql_datatype']
     replication_key_value = params['replication_key_value']
     schema_name = params['schema_name']
-    stream = params['stream']
-    if replication_key_value:
-        select_sql = f"""
+    table_name = params['table_name']
+
+    limit_statement = f'LIMIT {params["limit"]}' if params["limit"] else ''
+    where_statement = f"WHERE {replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
+        if replication_key_value else ""
+
+    select_sql = f"""
     SELECT {','.join(escaped_columns)}
-    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-    WHERE {post_db.prepare_columns_sql(replication_key)} >= '{replication_key_value}'::{replication_key_sql_datatype}
-    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
-    else:
-        # if not replication_key_value
-        select_sql = f"""SELECT {','.join(escaped_columns)}
-                                    FROM {post_db.fully_qualified_table_name(schema_name, stream['table_name'])}
-                                    ORDER BY {post_db.prepare_columns_sql(replication_key)} ASC"""
+    FROM (
+        SELECT *
+        FROM {post_db.fully_qualified_table_name(schema_name, table_name)} 
+        {where_statement}
+        ORDER BY {replication_key} ASC {limit_statement}
+    ) pg_speedup_trick;"""
+
     return select_sql

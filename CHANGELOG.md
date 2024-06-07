@@ -1,3 +1,22 @@
+2.1.0 (2023-03-30)
+-------------------
+**Changes**
+- INCREMENTAL: An optional config `limit` to be appended to incremental queries to limit their runtime.  
+
+**Fixes**
+- INCREMENTAL: `ORDER BY` added back to query in case replication key value is None. 
+
+2.0.0 (2022-11-02)
+-------------------
+**Changes**
+- LOG_BASED: Use wal2json format-version v2 to read WAL, require wal2json >= 2.3 to be installed on pg server.
+- Bump `psycopg2-binary` from `2.9.4` to `2.9.5`
+
+1.8.4 (2022-09-08)
+-------------------
+**Changes**
+- INCREMENTAL: Use sub-query to trick PostreSQL into more efficient use of index.
+
 1.8.3 (2022-01-18)
 -------------------
 **Fixes**
@@ -48,7 +67,7 @@
 Fix data loss issue when running `LOG_BASED` due to the tap not sending new SCHEMA singer messages when source tables change structure, mainly new/renamed columns, which causes the target to not be up to date with the stream structure.
 The tap now:
 * Runs discovery for selected stream at the beginning of sync to send up to date SCHEMA singer messages
-* When new columns are detected in WAL payloads, then run discovery for the stream and send new SCHEMA message. 
+* When new columns are detected in WAL payloads, then run discovery for the stream and send new SCHEMA message.
 
 1.6.2 (2020-05-18)
 -------------------

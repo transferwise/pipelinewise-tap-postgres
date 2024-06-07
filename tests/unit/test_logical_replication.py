@@ -43,6 +43,25 @@ class TestLogicalReplication(unittest.TestCase):
 
     def setUp(self):
         self.WalMessage = namedtuple('WalMessage', ['payload', 'data_start'])
+        self.conn_info = {'host': 'foo',
+                          'dbname': 'foo_db',
+                          'user': 'foo_user',
+                          'password': 'foo_pass',
+                          'port': 12345,
+                          'use_secondary': False,
+                          'tap_id': 'tap_id_value',
+                          'max_run_seconds': 10,
+                          'break_at_end_lsn': False,
+                          'logical_poll_total_seconds': 1}
+
+        self.logical_streams = [{
+            'tap_stream_id': 'foo-bar',
+            'schema': {'properties': {'foo_desired': 'b'}},
+            'stream': 'test',
+            'table_name': 'table_name_value',
+            'metadata': [{'metadata': {'sql-datatype': 'test', 'schema-name': 'schema_name_value'},
+                          'breadcrumb': ["properties", "foo_desired"]}]
+        }]
 
     def test_streams_to_wal2json_tables(self):
         """Validate if table names are escaped to wal2json format"""
@@ -163,7 +182,7 @@ class TestLogicalReplication(unittest.TestCase):
             logical_replication.consume_message(
                 [{'tap_stream_id': 'myschema-mytable'}],
                 {},
-                self.WalMessage(payload='{"kind":"truncate", "schema": "myschema", "table": "mytable"}',
+                self.WalMessage(payload='{"action":"truncate", "schema": "myschema", "table": "mytable"}',
                                 data_start='some lsn'),
                 None,
                 {}
@@ -232,13 +251,16 @@ class TestLogicalReplication(unittest.TestCase):
                     }
                 }
             },
-            self.WalMessage(payload='{"kind": "insert", '
-                                    '"schema": "myschema", '
-                                    '"table": "mytable",'
-                                    '"columnnames": ["id", "date_created", "new_col"],'
-                                    '"columnnames": [1, null, "some random text"]'
-                                    '}',
-                            data_start='some lsn'),
+            self.WalMessage(
+                payload='{"action": "I", '
+                        '"schema": "myschema", '
+                        '"table": "mytable",'
+                        '"columns": ['
+                        '{"name": "id", "value": 1}, '
+                        '{"name": "date_created", "value": null}, '
+                        '{"name": "new_col", "value": "some random text"}'
+                        ']}',
+                data_start='some lsn'),
             None,
             {}
         )
@@ -559,30 +581,6 @@ class TestLogicalReplication(unittest.TestCase):
             'key2': [{'kk': 'yo'}, {}]
         }, output)
 
-
-class TestAdditionalLogicalReplication(unittest.TestCase):
-
-    def setUp(self) -> None:
-        self.conn_info = {'host': 'foo',
-                          'dbname': 'foo_db',
-                          'user': 'foo_user',
-                          'password': 'foo_pass',
-                          'port': 12345,
-                          'use_secondary': False,
-                          'tap_id': 'tap_id_value',
-                          'max_run_seconds': 10,
-                          'break_at_end_lsn': False,
-                          'logical_poll_total_seconds': 1}
-
-        self.logical_streams = [{
-            'tap_stream_id': 'foo-bar',
-            'schema': {'properties': {'foo_desired': 'b'}},
-            'stream': 'test',
-            'table_name': 'table_name_value',
-            'metadata': [{'metadata': {'sql-datatype': 'test', 'schema-name': 'schema_name_value'},
-                          'breadcrumb': ["properties", "foo_desired"]}]
-        }]
-
     @patch("psycopg2.connect")
     def test_fetch_current_lsn_raises_exception_on_different_versions_of_pg(self, mocked_connect):
         """Test if it raises exception on unsupported versions"""
@@ -657,7 +655,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test if int_to_lsn returns expected values"""
         values_to_test = [(None, None),
                           (12, '0/C'),  # length < 32
-                          (2**123, '80000000000000000000000/0')  # Length > 32
+                          (2 ** 123, '80000000000000000000000/0')  # Length > 32
                           ]
         for lsni, expected_output in values_to_test:
             actual_output = logical_replication.int_to_lsn(lsni)
@@ -705,7 +703,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         """Test if the output of create_array_elem is as expected"""
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
-        test_values = [('foo',  '{bar}', ['bar']),
+        test_values = [('foo', '{bar}', ['bar']),
                        ('bit[]', {1}, [True]),
                        ('foo', None, None),
                        ('boolean[]', {True}, [True]),
@@ -802,7 +800,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         actual_output = logical_replication.locate_replication_slot(self.conn_info)
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_if_sql_datatype_is_money(self):
+    def test_impl_if_sql_datatype_is_money(self):
         """Test selected_value_to_singer_value_impl if sql_datatype is money"""
         elem = 'foo'
         og_sql_datatype = 'money'
@@ -812,7 +810,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_if_timestamp_with_time_zone_as_datatype_and_greater_than_fallback_datetime(self):
+    def test_impl_if_timestamp_with_time_zone_as_datatype_and_greater_than_fallback_datetime(self):
         """Test selected_value_to_singer_value_impl if datatype is
         timestamp with time zone and greater than FALLBACK_DATETIME"""
         # maximum value is hardcoded! and is 9999-12-31 23:59:59.999000
@@ -824,7 +822,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_datatype_timestamp_with_time_zone_and_parsed_elm_greater_than_and_not_datetime(self):
+    def test_impl_datatype_timestamp_with_time_zone_and_parsed_elm_greater_than_and_not_datetime(self):
         """Test selected_value_to_singer_value_impl if datatype is
         timestamp with time zone and parsed not datetime value greater than FALLBACK_DATETIME"""
         # maximum value is hardcoded! and is 9999-12-31 23:59:59.999000
@@ -836,7 +834,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_is_date_with_elm_is_datetime(self):
+    def test_impl_with_sql_datatype_is_date_with_elm_is_datetime(self):
         """Test selected_value_to_singer_value_impl if datatype is date and elm type is datetime"""
         elem = date(2022, 12, 31)
         og_sql_datatype = 'date'
@@ -846,7 +844,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         actual_output = logical_replication.selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info)
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_is_date_with_invalid_elem_raises_exception(self):
+    def test_impl_with_sql_datatype_is_date_with_invalid_elem_raises_exception(self):
         """Test selected_value_to_singer_value_impl raises ValueError exception
          if datatype is date and elem is invalid"""
         elem = 'foo'
@@ -858,7 +856,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
                           og_sql_datatype,
                           conn_info)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_is_time_with_time_zone_and_elem_starts_with_24(self):
+    def test_impl_with_sql_datatype_is_time_with_time_zone_and_elem_starts_with_24(self):
         """Test selected_value_to_singer_value_impl if datatype is time with time zone and elem starts with 24"""
         og_sql_datatype = 'time with time zone'
         expected_output = '01:12:11'
@@ -868,7 +866,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_is_time_without_time_zone_elem_starts_with_24(self):
+    def test_impl_with_sql_datatype_is_time_without_time_zone_elem_starts_with_24(self):
         """Test selected_value_to_singer_value_impl if datatype is time without time zone and elem starts with 24"""
         og_sql_datatype = 'time without time zone'
         expected_output = '00:12:11'
@@ -878,7 +876,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_is_bit(self):
+    def test_impl_with_sql_datatype_is_bit(self):
         """Test selected_value_to_singer_value_impl if datatype is bit"""
         og_sql_datatype = 'bit'
         elem = True
@@ -887,7 +885,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertTrue(actual_output)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_is_int(self):
+    def test_impl_with_sql_datatype_is_int(self):
         """Test selected_value_to_singer_value_impl if datatype is int"""
         og_sql_datatype = 'foo'
         elem = 23
@@ -897,7 +895,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_is_boolean(self):
+    def test_impl_with_sql_datatype_is_boolean(self):
         """Test selected_value_to_singer_value_impl if datatype is boolean"""
         og_sql_datatype = 'boolean'
         elem = 'foo'
@@ -912,7 +910,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         self.assertEqual(expected_output, actual_output)
 
     @patch("psycopg2.connect")
-    def test_slctv2sngrv_impl_with_sql_datatype_is_hstore(self, mocked_connect):
+    def test_impl_with_sql_datatype_is_hstore(self, mocked_connect):
         """Test selected_value_to_singer_value_impl if datatype is hstore"""
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
@@ -929,7 +927,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_with_sql_datatype_contains_numeric(self):
+    def test_impl_with_sql_datatype_contains_numeric(self):
         """Test selected_value_to_singer_value_impl if datatype contains numeric"""
         og_sql_datatype = 'foo numeric bar'
         elem = '2'
@@ -939,7 +937,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_with_float_elem(self):
+    def test_impl_with_float_elem(self):
         """Test selected_value_to_singer_value_impl if elem is float"""
         og_sql_datatype = 'foo'
         elem = 3.14
@@ -949,7 +947,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_output, actual_output)
 
-    def test_slctv2sngrv_impl_raises_exception_with_invalid_type_of_elem(self):
+    def test_impl_raises_exception_with_invalid_type_of_elem(self):
         """Test selected_value_to_singer_value_impl with invalid type of elem raises an exception"""
         og_sql_datatype = 'foo'
         elem = {}
@@ -964,21 +962,30 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
     @patch('tap_postgres.sync_strategies.logical_replication.sync_common.send_schema_message')
     def test_consume_message_if_payload_kind_insert_or_update(self, *args):
         """Test consume_message if the kind of payload is insert or update"""
-        class msg:
-            data_start = 'foo_start'
-            payload = None
 
-            @classmethod
-            def update_payload(cls, kind):
-                cls.payload = json.dumps(
-                    {
-                        'schema': 'foo',
-                        'table': 'bar',
-                        'kind': kind,
-                        'columnnames': ['_sdc_deleted_at'],
-                        'columnvalues': ['foo_column']
-                    }
-                )
+        data_start = 'foo_start'
+
+        insert_msg = self.WalMessage(data_start=data_start,
+                                     payload=json.dumps(
+                                         {
+                                             'schema': 'foo',
+                                             'table': 'bar',
+                                             'action': 'I',
+                                             'columns': [{'name': '_sdc_deleted_at', 'value': 'foo_column'}],
+                                         }
+                                     )
+                                     )
+
+        update_msg = self.WalMessage(data_start=data_start,
+                                     payload=json.dumps(
+                                         {
+                                             'schema': 'foo',
+                                             'table': 'bar',
+                                             'action': 'U',
+                                             'columns': [{'name': '_sdc_deleted_at', 'value': 'foo_column'}],
+                                         }
+                                     )
+                                     )
 
         streams = [{
             'tap_stream_id': 'foo-bar',
@@ -994,31 +1001,31 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
             'bookmarks': {
                 'foo-bar': {
                     'foo': 'bar',
-                    'lsn': msg.data_start,
+                    'lsn': data_start,
                     'version': state['bookmarks']['foo-bar']['version']
                 }
             }
         }
         self.conn_info['debug_lsn'] = True
-        for kind in ('insert', 'update'):
-            msg.update_payload(kind)
-            actual_output = logical_replication.consume_message(streams, state, msg, time_extracted, self.conn_info)
-            self.assertDictEqual(expected_output, actual_output)
+        actual_output = logical_replication.consume_message(streams, state, insert_msg, time_extracted, self.conn_info)
+        self.assertDictEqual(expected_output, actual_output)
+
+        actual_output = logical_replication.consume_message(streams, state, update_msg, time_extracted, self.conn_info)
+        self.assertDictEqual(expected_output, actual_output)
 
     @patch('tap_postgres.sync_strategies.logical_replication.refresh_streams_schema')
     @patch('tap_postgres.sync_strategies.logical_replication.sync_common.send_schema_message')
     def test_consume_message_raises_exception_if_delete_and_no_datatype_for_stream(self, *args):
         """Test consume_message raises exception if kind is delete and could not a datatype for the stream"""
-        class msg:
-            data_start = 'foo_start'
-            payload = json.dumps({
-                'schema': 'foo',
-                'table': 'bar',
-                'kind': 'delete',
-                'columnnames': ['_sdc_deleted_at'],
-                'columnvalues': ['good'],
-                'oldkeys': {'keynames': ['foo_desired'], 'keyvalues': ['bar_value']}
-            })
+
+        delete_msg = self.WalMessage(data_start='foo_start',
+                                     payload=json.dumps({
+                                         'schema': 'foo',
+                                         'table': 'bar',
+                                         'action': 'D',
+                                         'identity': [{'name': 'foo_desired', 'value': 'bar_value'}],
+                                     })
+                                     )
 
         streams = [{
             'tap_stream_id': 'foo-bar',
@@ -1032,7 +1039,7 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         self.conn_info['debug_lsn'] = True
         expected_message = f'Unable to find sql-datatype for stream {streams[0]}'
         with self.assertRaises(Exception) as exp:
-            logical_replication.consume_message(streams, state, msg, time_extracted, self.conn_info)
+            logical_replication.consume_message(streams, state, delete_msg, time_extracted, self.conn_info)
 
         self.assertEqual(expected_message, str(exp.exception))
 
@@ -1095,7 +1102,13 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
             decode=True,
             start_lsn=state['bookmarks']['foo-bar']['lsn'],
             status_interval=10,
-            options={'write-in-chunks': 1, 'add-tables': 'schema_name_value.table_name_value'}
+            options={
+                'format-version': 2,
+                'include-transaction': False,
+                'include-timestamp': True,
+                'include-types': False,
+                'actions': 'insert,update,delete',
+                'add-tables': 'schema_name_value.table_name_value'}
         )
 
     @patch('tap_postgres.sync_strategies.logical_replication.datetime.datetime')
@@ -1130,7 +1143,14 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
             decode=True,
             start_lsn=state['bookmarks']['foo-bar']['lsn'],
             status_interval=10,
-            options={'write-in-chunks': 1, 'add-tables': 'schema_name_value.table_name_value'}
+            options={
+                'format-version': 2,
+                'include-transaction': False,
+                'include-timestamp': True,
+                'include-types': False,
+                'actions': 'insert,update,delete',
+                'add-tables': 'schema_name_value.table_name_value'
+            }
         )
 
     @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
@@ -1180,7 +1200,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
                                f'{logical_replication.int_to_lsn(msg_data_start)} is' \
                                f' past end_lsn {logical_replication.int_to_lsn(end_lsn)}'
         with self.assertLogs() as captured_log:
-            actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
+            actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn,
+                                                            state_file)
             self.assertIn(expected_log_message, captured_log.output)
             self.assertEqual(state, actual_output)
 
@@ -1205,7 +1226,8 @@ class TestAdditionalLogicalReplication(unittest.TestCase):
         mocked_connect.return_value.cursor.return_value.read_message.return_value = None
         mocked_locate_rep_slot.return_value = 'mocked_value_for_replication_slot'
 
-        actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
+        actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn,
+                                                        state_file)
         self.assertEqual(state, actual_output)
 
     @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
