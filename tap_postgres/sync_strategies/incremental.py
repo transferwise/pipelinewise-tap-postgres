@@ -88,7 +88,8 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                               "schema_name": schema_name,
                                               "table_name": stream['table_name'],
                                               "limit": conn_info['limit'],
-                                              "skip_last_n_seconds": conn_info['skip_last_n_seconds']
+                                              "skip_last_n_seconds": conn_info['skip_last_n_seconds'],
+                                              "look_back_n_seconds": conn_info['look_back_n_seconds']
                                               })
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
@@ -134,6 +135,9 @@ def _get_select_sql(params):
 
     where_incr = f"{replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
         if replication_key_value else ""
+    
+    where_incr += f" - interval '{params['look_back_n_seconds']} seconds'" \
+        if params["look_back_n_seconds"] and replication_key_sql_datatype.startswith("timestamp") and replication_key_value else ""
 
     where_skip = f"{replication_key} <= NOW() - interval '{params['skip_last_n_seconds']} seconds'" \
         if params["skip_last_n_seconds"] and replication_key_sql_datatype.startswith("timestamp") else ""

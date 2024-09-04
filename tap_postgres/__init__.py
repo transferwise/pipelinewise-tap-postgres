@@ -394,6 +394,7 @@ def main_impl():
 
     limit = args.config.get('limit')
     skip_last_n_seconds = args.config.get('skip_last_n_seconds')
+    look_back_n_seconds = args.config.get('look_back_n_seconds')
     conn_config = {
         # Required config keys
         'host': args.config['host'],
@@ -411,7 +412,8 @@ def main_impl():
         'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
         'use_secondary': args.config.get('use_secondary', False),
         'limit': int(limit) if limit else None,
-        'skip_last_n_seconds': int(skip_last_n_seconds) if skip_last_n_seconds else None
+        'skip_last_n_seconds': int(skip_last_n_seconds) if skip_last_n_seconds else None,
+        'look_back_n_seconds': int(look_back_n_seconds) if look_back_n_seconds else None
     }
 
     if conn_config['use_secondary']:
