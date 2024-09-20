@@ -24,6 +24,7 @@ class TestLogicalReplication(unittest.TestCase):
                 {"name": 'colour', "type": "character varying"},
                 {"name": 'timestamp_ntz', "type": "timestamp without time zone"},
                 {"name": 'timestamp_tz', "type": "timestamp with time zone"},
+                {"name": 'int_range', "type": "int4range"},
             ],
             "name": cls.table_name}
 
@@ -53,19 +54,22 @@ class TestLogicalReplication(unittest.TestCase):
                         'name': 'betty',
                         'colour': 'blue',
                         'timestamp_ntz': '2020-09-01 10:40:59',
-                        'timestamp_tz': '2020-09-01 00:50:59+02'
+                        'timestamp_tz': '2020-09-01 00:50:59+02',
+                        'int_range': '[1,2)',
                     },
                     {
                         'name': 'smelly',
                         'colour': 'brown',
                         'timestamp_ntz': '2020-09-01 10:40:59 BC',
-                        'timestamp_tz': '2020-09-01 00:50:59+02 BC'
+                        'timestamp_tz': '2020-09-01 00:50:59+02 BC',
+                        'int_range': '[2,5)',
                     },
                     {
                         'name': 'pooper',
                         'colour': 'green',
                         'timestamp_ntz': '30000-09-01 10:40:59',
-                        'timestamp_tz': '10000-09-01 00:50:59+02'
+                        'timestamp_tz': '10000-09-01 00:50:59+02',
+                        'int_range': '[100,)',
                     }
                 ]
 
@@ -101,6 +105,7 @@ class TestLogicalReplication(unittest.TestCase):
                 'name': 'betty',
                 'timestamp_ntz': '2020-09-01T10:40:59+00:00',
                 'timestamp_tz': '2020-08-31T22:50:59+00:00',
+                'int_range': {'lower': 1, 'upper': 2, 'bounds': '[)'},
             },
             'time_extracted': unittest.mock.ANY,
             'version': unittest.mock.ANY
@@ -114,6 +119,7 @@ class TestLogicalReplication(unittest.TestCase):
                 'name': 'smelly',
                 'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
                 'timestamp_tz': '9999-12-31T23:59:59.999000+00:00',
+                'int_range': {'lower': 2, 'upper': 5, 'bounds': '[)'},
             },
             'time_extracted': unittest.mock.ANY,
             'version': unittest.mock.ANY
@@ -127,6 +133,7 @@ class TestLogicalReplication(unittest.TestCase):
                 'name': 'pooper',
                 'timestamp_ntz': '9999-12-31T23:59:59.999000+00:00',
                 'timestamp_tz': '9999-12-31T23:59:59.999000+00:00',
+                'int_range': {'lower': 100, 'upper': None, 'bounds': '[)'},
             },
             'time_extracted': unittest.mock.ANY,
             'version': unittest.mock.ANY
@@ -175,6 +182,7 @@ class TestLogicalReplication(unittest.TestCase):
                 'name': 'betty',
                 'timestamp_ntz': '2020-09-01T10:40:59+00:00',
                 'timestamp_tz': '2020-08-31T22:50:59+00:00',
+                'int_range': '[1,2)',
             },
             'time_extracted': unittest.mock.ANY,
             'version': unittest.mock.ANY,
@@ -190,6 +198,7 @@ class TestLogicalReplication(unittest.TestCase):
                 'nice_flag': False,
                 'timestamp_ntz': '2022-09-01T10:40:59+00:00',
                 'timestamp_tz': '9999-12-31T23:59:59.999+00:00',
+                'int_range': None,
             },
             'time_extracted': unittest.mock.ANY,
             'version': unittest.mock.ANY,

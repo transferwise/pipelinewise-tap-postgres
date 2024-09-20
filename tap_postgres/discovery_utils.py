@@ -280,6 +280,10 @@ def schema_for_column_datatype(col):
         schema['type'] = nullable_column('string', col.is_primary_key)
         return schema
 
+    if 'range' in data_type:
+        schema['type'] = nullable_column('object', col.is_primary_key)
+        return schema
+
     return schema
 
 
