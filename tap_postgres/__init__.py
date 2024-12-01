@@ -57,11 +57,20 @@ def do_sync_full_table(conn_config, stream, state, desired_columns, md_map):
     """
     LOGGER.info("Stream %s is using full_table replication", stream['tap_stream_id'])
     sync_common.send_schema_message(stream, [])
-    if md_map.get((), {}).get('is-view'):
-        state = full_table.sync_view(conn_config, stream, state, desired_columns, md_map)
-    else:
-        state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
-    return state
+    attempt = 0
+    while True:
+        try:
+            if md_map.get((), {}).get('is-view'):
+                state = full_table.sync_view(conn_config, stream, state, desired_columns, md_map)
+            else:
+                state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
+            return state
+        except Exception as e:
+            LOGGER.warn("error on read for a stream: %s. Message: %s", stream['tap_stream_id'], e)
+            if attempt > post_db.TRY_NUMBER:
+                raise e
+            else:
+                attempt = attempt + 1
 
 
 # Possible state keys: replication_key, replication_key_value, version
@@ -428,6 +437,8 @@ def main_impl():
         conn_config['sslmode'] = 'require'
 
     post_db.CURSOR_ITER_SIZE = int(args.config.get('itersize', post_db.CURSOR_ITER_SIZE))
+    post_db.TRY_NUMBER = int(args.config.get('trynumber', post_db.TRY_NUMBER))
+
 
     if args.discover:
         do_discovery(conn_config)
