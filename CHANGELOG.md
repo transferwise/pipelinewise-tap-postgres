@@ -1,3 +1,11 @@
+2.1.0 (2023-03-30)
+-------------------
+**Changes**
+- INCREMENTAL: An optional config `limit` to be appended to incremental queries to limit their runtime.  
+
+**Fixes**
+- INCREMENTAL: `ORDER BY` added back to query in case replication key value is None. 
+
 2.0.0 (2022-11-02)
 -------------------
 **Changes**
